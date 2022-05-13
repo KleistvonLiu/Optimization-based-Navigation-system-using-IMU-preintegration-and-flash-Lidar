@@ -20,7 +20,7 @@ Vs = [];
 Bas=0;
 Bgs=0;
 % ！！！！应该是要改成成员变量的，那就不用这么麻烦了
-g=9.8;
+%g=0;
 
 window_size = 10;
 c = 50;% frame size = 50 imu data points
@@ -32,12 +32,12 @@ dt = 0.001;
 acc = IMUmeas.acc_IB_B_ref.Data;
 gyr = IMUmeas.angRate_IB_B_ref.Data;
 
-for i = 1:10
+for i = 1:15000%length(acc)
     e.testProcessIMU(dt,acc(i,:)',gyr(i,:)');
     e.testProcessPC(c);
-    Rs(i) =e.Rs(2);
-    Ps(i) =e.Ps(2);
-    Vs(i) =e.Ps(2);
+    Rs(:,:,i) =e.Rs(:,:,2);
+    Ps(:,i) =e.Ps(:,2);
+    Vs(:,i) =e.Ps(:,2);
 end
 
 

@@ -87,7 +87,7 @@ classdef estimator < handle
             end
             % 注意此处是使用上一个历元的IMU数据!因此first_imu的设置还是有作用的
             if (length(obj.pre_integrations)<(obj.frame_count))
-                obj.pre_integrations(obj.frame_count) = IntegrationBase(obj.acc_0, obj.gyr_0, obj.Bas(obj.frame_count), obj.Bgs(obj.frame_count));
+                obj.pre_integrations = [obj.pre_integrations IntegrationBase(obj.acc_0, obj.gyr_0, obj.Bas(obj.frame_count), obj.Bgs(obj.frame_count))];
             end
             
             if (obj.frame_count ~= 1)
@@ -101,14 +101,15 @@ classdef estimator < handle
                 obj.gyr_buf=[obj.gyr_buf,angular_velocity];
                 
                 j = obj.frame_count;
-                un_acc_0 = obj.Rs(j) * (obj.acc_0 - obj.Bas(j)) - g;
-                un_gyr = 0.5 * (obj.gyr_0 + angular_velocity) - obj.Bgs(j);% !! Bgs(j)
+                global g
+                un_acc_0 = obj.Rs(:,:,j) * (obj.acc_0 - obj.Bas(:,j)) - g;
+                un_gyr = 0.5 * (obj.gyr_0 + angular_velocity) - obj.Bgs(:,j);% !! Bgs(j)
                 un_gyr = un_gyr * dt;
-                obj.Rs(j) =obj.Rs(j)*quat2rotm(quaternion(1,un_gyr(1),un_gyr(2),un_gyr(3)));
-                un_acc_1 = obj.Rs(j) * (linear_acceleration - obj.Bas) - g;% !! Bas(j)
+                obj.Rs(:,:,j) =obj.Rs(:,:,j)*quat2rotm(quaternion(1,un_gyr(1),un_gyr(2),un_gyr(3)));
+                un_acc_1 = obj.Rs(:,:,j) * (linear_acceleration - obj.Bas(:,j)) - g;% !! Bas(j)
                 un_acc = 0.5 * (un_acc_0 + un_acc_1);
-                obj.Ps(j) =obj.Ps(j)+ dt * obj.Vs(j) + 0.5 * dt * dt * un_acc;
-                obj.Vs(j) =obj.Ps(j)+ dt * un_acc;
+                obj.Ps(:,j) =obj.Ps(:,j)+ dt * obj.Vs(:,j) + 0.5 * dt * dt * un_acc;
+                obj.Vs(:,j) =obj.Ps(:,j)+ dt * un_acc;
             end
             obj.acc_0 = linear_acceleration;%应该是用来初始化IntegrationBase，每来一次数据都更新但是只有framecount+1的时候才用到
             obj.gyr_0 = angular_velocity;
@@ -137,14 +138,15 @@ classdef estimator < handle
                 obj.gyr_buf=[obj.gyr_buf,angular_velocity];
                 
                 j = obj.frame_count;
-                un_acc_0 = obj.Rs(j) * (obj.acc_0 - obj.Bas(j)) - g;
-                un_gyr = 0.5 * (obj.gyr_0 + angular_velocity) - obj.Bgs(j);% !! Bgs(j)
+                global g
+                un_acc_0 = obj.Rs(:,:,j) * (obj.acc_0 - obj.Bas(:,j)) - g;
+                un_gyr = 0.5 * (obj.gyr_0 + angular_velocity) - obj.Bgs(:,j);% !! Bgs(j)
                 un_gyr = un_gyr * dt;
-                obj.Rs(j) =obj.Rs(j)*quat2rotm(quaternion(1,un_gyr(1),un_gyr(2),un_gyr(3)));
-                un_acc_1 = obj.Rs(j) * (linear_acceleration - obj.Bas) - g;% !! Bas(j)
+                obj.Rs(:,:,j) =obj.Rs(:,:,j)*quat2rotm(quaternion(1,un_gyr(1),un_gyr(2),un_gyr(3)));
+                un_acc_1 = obj.Rs(:,:,j) * (linear_acceleration - obj.Bas(:,j)) - g;% !! Bas(j)
                 un_acc = 0.5 * (un_acc_0 + un_acc_1);
-                obj.Ps(j) =obj.Ps(j)+ dt * obj.Vs(j) + 0.5 * dt * dt * un_acc;
-                obj.Vs(j) =obj.Ps(j)+ dt * un_acc;
+                obj.Ps(:,j) =obj.Ps(:,j)+ dt * obj.Vs(:,j) + 0.5 * dt * dt * un_acc;
+                obj.Vs(:,j) =obj.Ps(:,j)+ dt * un_acc;
             end
             obj.acc_0 = linear_acceleration;%应该是用来初始化IntegrationBase，每来一次数据都更新但是只有framecount+1的时候才用到
             obj.gyr_0 = angular_velocity;

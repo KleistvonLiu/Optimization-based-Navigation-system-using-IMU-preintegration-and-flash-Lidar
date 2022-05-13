@@ -22,10 +22,12 @@ global ACC_N
 global GYR_N
 global ACC_W
 global GYR_W
+global g
 ACC_N=0.08;
 GYR_N=0.004;
 ACC_W=0.00004;
 GYR_W=2.0e-6;
+g = 0;% 0 for IMUmeas data
 
 % #loop closure parameters
 % loop_closure: 1                    # start loop closure

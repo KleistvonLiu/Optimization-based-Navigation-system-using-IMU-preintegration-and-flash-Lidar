@@ -80,9 +80,7 @@ classdef IntegrationBase < handle
             obj.gyr_1=gyr_1;
             [result_delta_q,result_delta_p,result_delta_v,result_linearized_ba,result_linearized_bg]=...
                 midPointIntegration(obj, obj.dt, obj.acc_0, obj.gyr_0, acc_1, gyr_1, obj.delta_p,...
-                obj.delta_q, obj.delta_v,obj.linearized_ba, obj.linearized_bg,...
-                result_delta_p, result_delta_q, result_delta_v,...
-                result_linearized_ba, result_linearized_bg, 1);
+                obj.delta_q, obj.delta_v,obj.linearized_ba, obj.linearized_bg, 1);
             obj.delta_p = result_delta_p;
             obj.delta_q = result_delta_q;
             obj.delta_v = result_delta_v;
@@ -96,12 +94,10 @@ classdef IntegrationBase < handle
         
         function [result_delta_q,result_delta_p,result_delta_v,result_linearized_ba,result_linearized_bg] ...
                 = midPointIntegration(obj, dt_, acc_0_, gyr_0, acc_1, gyr_1, delta_p,...
-                delta_q, delta_v,linearized_ba, linearized_bg,...
-                result_delta_p, result_delta_q, result_delta_v,...
-                result_linearized_ba, result_linearized_bg, update_jacobian)
+                delta_q, delta_v,linearized_ba, linearized_bg, update_jacobian)
             un_acc_0 = quat2rotm(obj.delta_q)*(obj.acc_0 - obj.linearized_ba);
             un_gyr = 0.5 * (obj.gyr_0 + obj.gyr_1) - obj.linearized_bg;
-            result_delta_q = obj.delta_q*quaternion(1,un_gyr(0)*obj.dt/2,un_gyr(1)*obj.dt/2,un_gyr(2)*obj.dt/2);
+            result_delta_q = obj.delta_q*quaternion(1,un_gyr(1)*obj.dt/2,un_gyr(2)*obj.dt/2,un_gyr(3)*obj.dt/2);
             un_acc_1 = quat2rotm(result_delta_q)*(obj.acc_1-obj.linearized_ba);
             un_acc = 0.5 * (un_acc_0 + un_acc_1);
             result_delta_p = obj.delta_p + obj.delta_v * obj.dt + 0.5 * un_acc * obj.dt * obj.dt;
@@ -151,7 +147,7 @@ classdef IntegrationBase < handle
                 %step_jacobian = F;
                 %step_V = V;
                 obj.jacobian = F * obj.jacobian;
-                obj.covariance = F * obj.covariance * F.transpose() + V * obj.noise * V.transpose();
+                obj.covariance = F * obj.covariance * F.' + V * obj.noise * V.';
             end
         end
         function setNoise(obj)
