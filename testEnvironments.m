@@ -22,6 +22,8 @@ Bgs=0;
 % ！！！！应该是要改成成员变量的，那就不用这么麻烦了
 %g=0;
 
+flag = 2;
+
 window_size = 10;
 c = 50;% frame size = 50 imu data points
 e = estimator(window_size);
@@ -32,15 +34,25 @@ dt = 0.001;
 acc = IMUmeas.acc_IB_B_ref.Data;
 gyr = IMUmeas.angRate_IB_B_ref.Data;
 
-for i = 1:15000%length(acc)
-    e.testProcessIMU(dt,acc(i,:)',gyr(i,:)');
-    e.testProcessPC(c);
+enddata = 15000;%length(acc)
+step = 20;%10 for just same window size
+
+for i = 1:enddata
+    
+    e.processIMU(dt,acc(i,:)',gyr(i,:)');
+    
+    if mod(i,enddata/step) == 1
+    e.testProcessPC(flag,c);
+    end
+    
     Rs(:,:,i) =e.Rs(:,:,2);
     Ps(:,i) =e.Ps(:,2);
     Vs(:,i) =e.Ps(:,2);
-end
-Ps10 = Ps(:,1:100:end).'; % 1000hz to 10hz
 
+end
+if (flag == 1)
+    Ps10 = Ps(:,1:100:end).'; % 1000hz to 10hz
+end
 
 function [Ps,Rs,Vs]=processIMU(dt,linear_acceleration,angular_velocity,ini,Rs,Ps,Vs,Bas,Bgs)
     % if obj.initial true, set initial acc0 and gyro0, the flag comes from

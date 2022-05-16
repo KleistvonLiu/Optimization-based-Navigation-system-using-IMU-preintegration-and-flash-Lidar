@@ -93,12 +93,6 @@ classdef estimator < handle
                 obj.pre_integrations = [obj.pre_integrations IntegrationBase(obj.acc_0, obj.gyr_0, obj.Bas(obj.frame_count), obj.Bgs(obj.frame_count))];
             end
             
-            % if new frame,Pnew initial value = Pold end value
-            if (obj.new_frame == 1)
-                obj.Rs(:,:,j) = obj.Rs(:,:,j-1);
-                obj.Ps(:,j) =obj.Ps(:,j-1);
-                obj.Vs(:,j) =obj.Vs(:,j-1);
-            end 
             
             if (obj.frame_count ~= 1)
                 
@@ -111,6 +105,15 @@ classdef estimator < handle
                 obj.gyr_buf=[obj.gyr_buf,angular_velocity];
                 
                 j = obj.frame_count;
+                
+                % if new frame,Pnew initial value = Pold end value
+                if (obj.new_frame == 1)
+                    obj.Rs(:,:,j) = obj.Rs(:,:,j-1);
+                    obj.Ps(:,j) =obj.Ps(:,j-1);
+                    obj.Vs(:,j) =obj.Vs(:,j-1);
+                    obj.new_frame = 0;
+                end 
+                
                 global g
                 un_acc_0 = obj.Rs(:,:,j) * (obj.acc_0 - obj.Bas(:,j)) - g;
                 un_gyr = 0.5 * (obj.gyr_0 + angular_velocity) - obj.Bgs(:,j);% !! Bgs(j)
@@ -169,16 +172,31 @@ classdef estimator < handle
             %                 [Ps,Rs,Vs,Bas,Bgs]=DOoptimization(Ps,Rs,Vs,Bas,Bgs,预积分变量,J,Q)
             %             else
             %                 obj.frame_count = obj.frame_count + 1;
+            %                 obj.new_frame = 1;
             %             end
+            
+            
             
         end
         
-        function testProcessPC(obj,c)
-            
-            obj.frame_count = 2; %只测试连续的imu积分
-            if obj.count == c
-                obj.count = 1;
-                % obj.frame_count = obj.frame_count + 1;
+        function testProcessPC(obj,flag,c)
+            %% 只测试连续的imu积分
+            if(flag == 1)
+                obj.frame_count = 2; %
+                if obj.count == c
+                    obj.count = 1;
+                    % obj.frame_count = obj.frame_count + 1;
+                end
+            end
+            %% 测试10个frame的imu积分
+            if(flag == 2)
+                if obj.frame_count == obj.window_size + 1
+                    %[Ps,Rs,Vs,Bas,Bgs]=optimization(Ps,Rs,Vs,Bas,Bgs,预积分变量,J,Q)
+                    slide_window(obj,1,2,3);
+                else
+                    obj.frame_count = obj.frame_count + 1;
+                    obj.new_frame = 1;
+                end
             end
             
         end
@@ -195,12 +213,11 @@ classdef estimator < handle
         
         function slide_window(obj,dt,acc,gyr)
             
-            %             if obj.frame_count = obj.window_size
-            %                 [Ps,Rs,Vs,Bas,Bgs]=DOoptimization(Ps,Rs,Vs,Bas,Bgs,预积分变量,J,Q)
-            %             else
-            %                 obj.frame_count = obj.frame_count + 1;
-            %             end
+            obj.Rs(:,:,1:obj.window_size) =obj.Rs(:,:,2:end);
+            obj.Ps(:,1:obj.window_size) =obj.Ps(:,2:end);
+            obj.Vs(:,1:obj.window_size) =obj.Vs(:,2:end);
             
+            obj.pre_integrations(1) = [];
         end
         
         function push_back(obj,dt,acc,gyr)
