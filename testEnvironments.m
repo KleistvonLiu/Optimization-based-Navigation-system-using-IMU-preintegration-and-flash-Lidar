@@ -39,7 +39,7 @@ for i = 1:15000%length(acc)
     Ps(:,i) =e.Ps(:,2);
     Vs(:,i) =e.Ps(:,2);
 end
-
+Ps10 = Ps(:,1:100:end).'; % 1000hz to 10hz
 
 
 function [Ps,Rs,Vs]=processIMU(dt,linear_acceleration,angular_velocity,ini,Rs,Ps,Vs,Bas,Bgs)

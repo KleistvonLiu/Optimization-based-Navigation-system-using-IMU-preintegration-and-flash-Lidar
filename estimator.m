@@ -29,6 +29,7 @@ classdef estimator < handle
         gyr_0;
         initial; %for processIMU, if initial data or not
         frame_count; % number of key frames, from 1 to window_size+1
+        new_frame; % if new frame,Pnew initial value = Pold end value
         Ps;
         Vs;
         Rs;
@@ -37,6 +38,7 @@ classdef estimator < handle
         window_size;
         pre_integrations;
         first_imu;
+        
         
         count;% just for test processPC
     end
@@ -59,6 +61,7 @@ classdef estimator < handle
             obj.gyr_buf = [];
             obj.count = 1;
             obj.frame_count = 1;
+            obj.new_frame = 0;
             obj.pre_integrations = [];
             
             %             obj.Ps = initial_acc_0;
@@ -90,6 +93,13 @@ classdef estimator < handle
                 obj.pre_integrations = [obj.pre_integrations IntegrationBase(obj.acc_0, obj.gyr_0, obj.Bas(obj.frame_count), obj.Bgs(obj.frame_count))];
             end
             
+            % if new frame,Pnew initial value = Pold end value
+            if (obj.new_frame == 1)
+                obj.Rs(:,:,j) = obj.Rs(:,:,j-1);
+                obj.Ps(:,j) =obj.Ps(:,j-1);
+                obj.Vs(:,j) =obj.Vs(:,j-1);
+            end 
+            
             if (obj.frame_count ~= 1)
                 
                 obj.pre_integrations(obj.frame_count).push_back(dt, linear_acceleration, angular_velocity);
@@ -105,11 +115,11 @@ classdef estimator < handle
                 un_acc_0 = obj.Rs(:,:,j) * (obj.acc_0 - obj.Bas(:,j)) - g;
                 un_gyr = 0.5 * (obj.gyr_0 + angular_velocity) - obj.Bgs(:,j);% !! Bgs(j)
                 un_gyr = un_gyr * dt;
-                obj.Rs(:,:,j) =obj.Rs(:,:,j)*quat2rotm(quaternion(1,un_gyr(1),un_gyr(2),un_gyr(3)));
+                obj.Rs(:,:,j) =obj.Rs(:,:,j)*quat2rotm(quaternion(1,un_gyr(1)/2,un_gyr(2)/2,un_gyr(3)/2));
                 un_acc_1 = obj.Rs(:,:,j) * (linear_acceleration - obj.Bas(:,j)) - g;% !! Bas(j)
                 un_acc = 0.5 * (un_acc_0 + un_acc_1);
                 obj.Ps(:,j) =obj.Ps(:,j)+ dt * obj.Vs(:,j) + 0.5 * dt * dt * un_acc;
-                obj.Vs(:,j) =obj.Ps(:,j)+ dt * un_acc;
+                obj.Vs(:,j) =obj.Vs(:,j)+ dt * un_acc;
             end
             obj.acc_0 = linear_acceleration;%应该是用来初始化IntegrationBase，每来一次数据都更新但是只有framecount+1的时候才用到
             obj.gyr_0 = angular_velocity;
@@ -142,11 +152,11 @@ classdef estimator < handle
                 un_acc_0 = obj.Rs(:,:,j) * (obj.acc_0 - obj.Bas(:,j)) - g;
                 un_gyr = 0.5 * (obj.gyr_0 + angular_velocity) - obj.Bgs(:,j);% !! Bgs(j)
                 un_gyr = un_gyr * dt;
-                obj.Rs(:,:,j) =obj.Rs(:,:,j)*quat2rotm(quaternion(1,un_gyr(1),un_gyr(2),un_gyr(3)));
+                obj.Rs(:,:,j) =obj.Rs(:,:,j)*quat2rotm(quaternion(1,un_gyr(1)/2,un_gyr(2)/2,un_gyr(3)/2));
                 un_acc_1 = obj.Rs(:,:,j) * (linear_acceleration - obj.Bas(:,j)) - g;% !! Bas(j)
                 un_acc = 0.5 * (un_acc_0 + un_acc_1);
                 obj.Ps(:,j) =obj.Ps(:,j)+ dt * obj.Vs(:,j) + 0.5 * dt * dt * un_acc;
-                obj.Vs(:,j) =obj.Ps(:,j)+ dt * un_acc;
+                obj.Vs(:,j) =obj.Vs(:,j)+ dt * un_acc;
             end
             obj.acc_0 = linear_acceleration;%应该是用来初始化IntegrationBase，每来一次数据都更新但是只有framecount+1的时候才用到
             obj.gyr_0 = angular_velocity;
