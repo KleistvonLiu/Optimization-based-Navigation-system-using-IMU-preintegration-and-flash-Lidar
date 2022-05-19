@@ -33,12 +33,21 @@ classdef estimator < handle
         Ps;
         Vs;
         Rs;
+        Qs;
         Bas;
         Bgs;
         window_size;
         pre_integrations;
         first_imu;
         
+        % container for parameters that needs to be sent to mex files
+        dpContainer;%3*10
+        dqContainer;%4*10
+        dvContainer;%3*10
+        JContainer;%15*15*10
+        PContainer;%15*15*10
+        baContainer;%3*10
+        bgContainer;%3*10
         
         count;% just for test processPC
     end
@@ -53,6 +62,7 @@ classdef estimator < handle
             obj.Ps = zeros(3,obj.window_size+1);
             obj.Vs = zeros(3,obj.window_size+1);
             obj.Rs = repmat(eye(3),1,1,obj.window_size+1);
+            obj.Qs = zeros(4,obj.window_size+1);
             obj.Bas = zeros(3,obj.window_size+1);
             obj.Bgs = zeros(3,obj.window_size+1);
             obj.first_imu = false;
@@ -63,6 +73,14 @@ classdef estimator < handle
             obj.frame_count = 1;
             obj.new_frame = 0;
             obj.pre_integrations = [];
+            
+            obj.dpContainer = zeros(3,obj.window_size);%3*10
+            obj.dqContainer = zeros(4,obj.window_size);%4*10
+            obj.dvContainer = zeros(3,obj.window_size);%3*10
+            obj.JContainer = zeros(15,15,obj.window_size);%15*15*10
+            obj.PContainer = zeros(15,15,obj.window_size);%15*15*10
+            obj.baContainer = zeros(3,obj.window_size);%3*10
+            obj.bgContainer = zeros(3,obj.window_size);%3*10
             
             %             obj.Ps = initial_acc_0;
             %             obj.gyr_0 = initial_gyr_0;
@@ -202,7 +220,27 @@ classdef estimator < handle
         end
         
         function optimization(obj,dt,acc,gyr)
+            %input integrationBase2-11的预积分变量 J and Q also bias，Ps[1-11]
+            obj.Qs = rotm2quat(obj.Rs).';
+%             obj.Ps
+%             obj.Rs
+%             obj.Vs
+%             obj.Bas
+%             obj.Bgs
+            for i = 1:obj.window_size
+                obj.dpContainer(:,i) = obj.pre_integrations(i+1).delta_p;%3*10
+                obj.dqContainer(:,i) = obj.pre_integrations(i+1).delta_q;%4*10
+                obj.dvContainer(:,i) = obj.pre_integrations(i+1).delta_v;%3*10
+                obj.JContainer(:,:,i) = obj.pre_integrations(i+1).jacobian;%15*15*10
+                obj.PContainer(:,:,i) = obj.pre_integrations(i+1).covariance;%15*15*10
+                obj.baContainer(:,i) = obj.pre_integrations(i+1).linearized_ba;%3*10
+                obj.bgContainer(:,i) = obj.pre_integrations(i+1).linearized_bg;%3*10
+            end
+
             
+            [Ps,Qs,Vs,Bas,Bgs]=ceres_optimization(obj.Ps,obj.Rs,obj.Qs,obj.Vs,obj.Bas,obj.Bgs,...
+                obj.dpContainer,obj.dqContainer,obj.dvContainer,obj.JContainer,obj.PContainer,...
+                obj.baContainer,obj.bgContainer);
             %             if obj.frame_count = obj.window_size
             %                 [Ps,Rs,Vs,Bas,Bgs]=DOoptimization(Ps,Rs,Vs,Bas,Bgs,预积分变量,J,Q)
             %             else
