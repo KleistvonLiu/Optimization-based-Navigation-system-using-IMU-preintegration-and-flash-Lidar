@@ -43,6 +43,7 @@ classdef estimator < handle
         % container for parameters that needs to be sent to mex files
         dpContainer;%3*10
         dqContainer;%4*10
+        dqContainerArray;%4*10
         dvContainer;%3*10
         JContainer;%15*15*10
         PContainer;%15*15*10
@@ -62,7 +63,7 @@ classdef estimator < handle
             obj.Ps = zeros(3,obj.window_size+1);
             obj.Vs = zeros(3,obj.window_size+1);
             obj.Rs = repmat(eye(3),1,1,obj.window_size+1);
-            obj.Qs = zeros(4,obj.window_size+1);
+            obj.Qs = quaternion(rand(obj.window_size+1,4));
             obj.Bas = zeros(3,obj.window_size+1);
             obj.Bgs = zeros(3,obj.window_size+1);
             obj.first_imu = false;
@@ -75,7 +76,8 @@ classdef estimator < handle
             obj.pre_integrations = [];
             
             obj.dpContainer = zeros(3,obj.window_size);%3*10
-            obj.dqContainer = zeros(4,obj.window_size);%4*10
+            obj.dqContainer = quaternion(zeros(obj.window_size,4));%10*4
+            obj.dqContainerArray = zeros(obj.window_size,4);%10*4
             obj.dvContainer = zeros(3,obj.window_size);%3*10
             obj.JContainer = zeros(15,15,obj.window_size);%15*15*10
             obj.PContainer = zeros(15,15,obj.window_size);%15*15*10
@@ -209,7 +211,7 @@ classdef estimator < handle
             %% 测试10个frame的imu积分
             if(flag == 2)
                 if obj.frame_count == obj.window_size + 1
-                    %[Ps,Rs,Vs,Bas,Bgs]=optimization(Ps,Rs,Vs,Bas,Bgs,预积分变量,J,Q)
+                    optimization(obj)
                     slide_window(obj,1,2,3);
                 else
                     obj.frame_count = obj.frame_count + 1;
@@ -219,9 +221,9 @@ classdef estimator < handle
             
         end
         
-        function optimization(obj,dt,acc,gyr)
+        function optimization(obj)
             %input integrationBase2-11的预积分变量 J and Q also bias，Ps[1-11]
-            obj.Qs = rotm2quat(obj.Rs).';
+            obj.Qs = rotm2quat(obj.Rs);
 %             obj.Ps
 %             obj.Rs
 %             obj.Vs
@@ -229,18 +231,21 @@ classdef estimator < handle
 %             obj.Bgs
             for i = 1:obj.window_size
                 obj.dpContainer(:,i) = obj.pre_integrations(i+1).delta_p;%3*10
-                obj.dqContainer(:,i) = obj.pre_integrations(i+1).delta_q;%4*10
+                obj.dqContainer(i) = obj.pre_integrations(i+1).delta_q;%10*4
                 obj.dvContainer(:,i) = obj.pre_integrations(i+1).delta_v;%3*10
                 obj.JContainer(:,:,i) = obj.pre_integrations(i+1).jacobian;%15*15*10
                 obj.PContainer(:,:,i) = obj.pre_integrations(i+1).covariance;%15*15*10
                 obj.baContainer(:,i) = obj.pre_integrations(i+1).linearized_ba;%3*10
                 obj.bgContainer(:,i) = obj.pre_integrations(i+1).linearized_bg;%3*10
             end
-
-            
-            [Ps,Qs,Vs,Bas,Bgs]=ceres_optimization(obj.Ps,obj.Rs,obj.Qs,obj.Vs,obj.Bas,obj.Bgs,...
-                obj.dpContainer,obj.dqContainer,obj.dvContainer,obj.JContainer,obj.PContainer,...
+                obj.dqContainerArray = compact(obj.dqContainer);
+                
+            ceres_optimization(obj.Ps,obj.Rs,obj.Qs,obj.Vs,obj.Bas,obj.Bgs,...
+                obj.dpContainer,obj.dqContainerArray,obj.dvContainer,obj.JContainer,obj.PContainer,...
                 obj.baContainer,obj.bgContainer);
+%             [Ps,Qs,Vs,Bas,Bgs]=ceres_optimization(obj.Ps,obj.Rs,obj.Qs,obj.Vs,obj.Bas,obj.Bgs,...
+%                 obj.dpContainer,obj.dqContainer,obj.dvContainer,obj.JContainer,obj.PContainer,...
+%                 obj.baContainer,obj.bgContainer);
             %             if obj.frame_count = obj.window_size
             %                 [Ps,Rs,Vs,Bas,Bgs]=DOoptimization(Ps,Rs,Vs,Bas,Bgs,预积分变量,J,Q)
             %             else
