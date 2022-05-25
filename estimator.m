@@ -49,6 +49,7 @@ classdef estimator < handle
         PContainer;%15*15*10
         baContainer;%3*10
         bgContainer;%3*10
+        dtContainer;
         
         count;% just for test processPC
     end
@@ -83,7 +84,7 @@ classdef estimator < handle
             obj.PContainer = zeros(15,15,obj.window_size);%15*15*10
             obj.baContainer = zeros(3,obj.window_size);%3*10
             obj.bgContainer = zeros(3,obj.window_size);%3*10
-            
+            obj.dtContainer = zeros(1,obj.window_size);%3*10
             %             obj.Ps = initial_acc_0;
             %             obj.gyr_0 = initial_gyr_0;
             %             obj.linearized_acc = initial_acc_0;
@@ -237,21 +238,56 @@ classdef estimator < handle
                 obj.PContainer(:,:,i) = obj.pre_integrations(i+1).covariance;%15*15*10
                 obj.baContainer(:,i) = obj.pre_integrations(i+1).linearized_ba;%3*10
                 obj.bgContainer(:,i) = obj.pre_integrations(i+1).linearized_bg;%3*10
+                obj.dtContainer(i) = obj.pre_integrations(i+1).sum_dt;%1*10
             end
                 obj.dqContainerArray = compact(obj.dqContainer);
                 
-            ceres_optimization(obj.Ps,obj.Rs,obj.Qs,obj.Vs,obj.Bas,obj.Bgs,...
+            [para_pose,para_speedbias] = ceres_optimization(obj.Ps,obj.Rs,obj.Qs,obj.Vs,obj.Bas,obj.Bgs,...
                 obj.dpContainer,obj.dqContainerArray,obj.dvContainer,obj.JContainer,obj.PContainer,...
-                obj.baContainer,obj.bgContainer);
+                obj.baContainer,obj.bgContainer,obj.dtContainer);
 %             [Ps,Qs,Vs,Bas,Bgs]=ceres_optimization(obj.Ps,obj.Rs,obj.Qs,obj.Vs,obj.Bas,obj.Bgs,...
 %                 obj.dpContainer,obj.dqContainer,obj.dvContainer,obj.JContainer,obj.PContainer,...
 %                 obj.baContainer,obj.bgContainer);
+            
+            para_pose = reshape(para_pose,[7,11]).';
+            para_speedbias = reshape(para_speedbias,[9,11]).';
             %             if obj.frame_count = obj.window_size
             %                 [Ps,Rs,Vs,Bas,Bgs]=DOoptimization(Ps,Rs,Vs,Bas,Bgs,预积分变量,J,Q)
             %             else
             %                 obj.frame_count = obj.frame_count + 1;
             %             end
             
+            % 计算初始位置的R的偏移，先用ypr 如果不行，直接算R的差
+            origin_R0 = R2ypr(obj.Rs(:,:,1));
+            origin_R00 = R2ypr(quat2rotm(quaternion(para_pose(1,7),para_pose(1,4),para_pose(1,5),para_pose(1,6))));
+            origin_P0 = obj.Ps(:,1);
+            y_diff = origin_R0(1) - origin_R00(1);
+            rot_diff = eul2rotm([y_diff, 0, 0]);
+            if (abs(abs(origin_R0(2)) - 90) < 1.0 || abs(abs(origin_R00(2)) - 90) < 1.0)
+                disp(["euler singular point!"]);
+                rot_diff = obj.Rs(:,:,1) * quat2rotm(quaternion(para_pose(1,7),para_pose(1,4),para_pose(1,5),para_pose(1,6))).';
+            end
+            
+            for i = 1:obj.window_size+1
+           
+                obj.Rs(:,:,i) = rot_diff * quat2rotm(normalize(quaternion(para_pose(i,7),para_pose(i,4),para_pose(i,5),para_pose(i,6))));
+
+                obj.Ps(:,i) = rot_diff * [para_pose(i,1) - para_pose(1,1);
+                                        para_pose(i,2) - para_pose(1,2);
+                                        para_pose(i,3) - para_pose(1,3)] + origin_P0;
+
+                obj.Vs(:,i) = rot_diff * [para_speedbias(i,1);
+                                            para_speedbias(i,2);
+                                            para_speedbias(i,3)];
+
+                obj.Bas(:,i) = [para_speedbias(i,4);
+                          para_speedbias(i,5);
+                          para_speedbias(i,6)];
+
+                obj.Bgs(:,i) = [para_speedbias(i,7);
+                                            para_speedbias(i,8);
+                                            para_speedbias(i,9)];
+            end
         end
         
         function slide_window(obj,dt,acc,gyr)
@@ -262,123 +298,8 @@ classdef estimator < handle
             
             obj.pre_integrations(1) = [];
         end
+
         
-        function push_back(obj,dt,acc,gyr)
-            
-            obj.dt_buf=[obj.dt_buf,dt];
-            obj.acc_buf=[obj.acc_buf,acc];
-            obj.gyr_buf=[obj.gyr_buf,gyr];
-            propagate(obj,dt,acc,gyr)
-        end
         
-        function repropagate(obj,initial_linearized_ba,initial_linearized_bg)
-            obj.sum_dt = 0.0;
-            obj.acc_0 = obj.linearized_acc;
-            obj.gyr_0 = obj.linearized_gyr;
-            obj.delta_p = zeros(3,1);
-            obj.delta_q = quaternion(1,0,0,0);%四元数的表达方式
-            obj.delta_v = zeros(3,1);
-            obj.linearized_ba = initial_linearized_ba;
-            obj.linearized_bg = initial_linearized_bg;
-            obj.jacobian = eye(15);
-            obj.covariance = zeros(15,15);
-            for i=1:size(obj.dt_buf,2)
-                propagate(obj.dt_buf(i), obj.acc_buf(i), obj.gyr_buf(i));
-            end
-        end
-        
-        function propagate(obj,dt,acc_1,gyr_1)
-            obj.dt=dt;
-            obj.acc_1=acc_1;
-            obj.gyr_1=gyr_1;
-            [result_delta_q,result_delta_p,result_delta_v,result_linearized_ba,result_linearized_bg]=...
-                midPointIntegration(obj, obj.dt, obj.acc_0, obj.gyr_0, acc_1, gyr_1, obj.delta_p,...
-                obj.delta_q, obj.delta_v,obj.linearized_ba, obj.linearized_bg,...
-                result_delta_p, result_delta_q, result_delta_v,...
-                result_linearized_ba, result_linearized_bg, 1);
-            obj.delta_p = result_delta_p;
-            obj.delta_q = result_delta_q;
-            obj.delta_v = result_delta_v;
-            obj.linearized_ba = result_linearized_ba;
-            obj.linearized_bg = result_linearized_bg;
-            obj.delta_q = normalize(obj.delta_q);
-            obj.sum_dt = obj.sum_dt+dt;
-            obj.acc_0 = acc_1;
-            obj.gyr_0 = gyr_1;
-        end
-        
-        function [result_delta_q,result_delta_p,result_delta_v,result_linearized_ba,result_linearized_bg] ...
-                = midPointIntegration(obj, dt_, acc_0_, gyr_0, acc_1, gyr_1, delta_p,...
-                delta_q, delta_v,linearized_ba, linearized_bg,...
-                result_delta_p, result_delta_q, result_delta_v,...
-                result_linearized_ba, result_linearized_bg, update_jacobian)
-            un_acc_0 = quat2rotm(obj.delta_q)*(obj.acc_0 - obj.linearized_ba);
-            un_gyr = 0.5 * (obj.gyr_0 + obj.gyr_1) - obj.linearized_bg;
-            result_delta_q = obj.delta_q*quaternion(1,un_gyr(0)*obj.dt/2,un_gyr(1)*obj.dt/2,un_gyr(2)*obj.dt/2);
-            un_acc_1 = quat2rotm(result_delta_q)*(obj.acc_1-obj.linearized_ba);
-            un_acc = 0.5 * (un_acc_0 + un_acc_1);
-            result_delta_p = obj.delta_p + obj.delta_v * obj.dt + 0.5 * un_acc * obj.dt * obj.dt;
-            result_delta_v = obj.delta_v + un_acc * obj.dt;
-            result_linearized_ba = obj.linearized_ba;
-            result_linearized_bg = obj.linearized_bg;
-            if(update_jacobian)
-                w_x = 0.5 * (obj.gyr_0 + obj.gyr_1) - obj.linearized_bg;
-                a_0_x = obj.acc_0 - obj.linearized_ba;
-                a_1_x = obj.acc_1 - obj.linearized_ba;
-                R_w_x=skew(w_x);
-                R_a_0_x=skew(a_0_x);
-                R_a_1_x=skew(a_1_x);
-                
-                F = zeros(15, 15);
-                F(1:3,1:3) = eye(3);
-                F(1:3, 4:6) = -0.25 *quat2rotm(obj.delta_q)* R_a_0_x * obj.dt * obj.dt +...
-                    -0.25 * quat2rotm(result_delta_q)* R_a_1_x * (eye(3) - R_w_x * obj.dt) * obj.dt * obj.dt;
-                F(1:3,7:9) = eye(3)*obj.dt;
-                F(1:3, 10:12) = -0.25 * (quat2rotm(obj.delta_q) + quat2rotm(result_delta_q)) *obj.dt * obj.dt;
-                F(1:3, 13:15) = -0.25 * quat2rotm(result_delta_q) * R_a_1_x * obj.dt *obj.dt * (-obj.dt);
-                F(4:6, 4:6) = eye(3) - R_w_x * obj.dt;
-                F(4:6, 13:15) = -1.0 * eye(3) * obj.dt;
-                F(7:9, 4:6) = -0.5 * quat2rotm(obj.delta_q) * R_a_0_x * obj.dt + ...
-                    -0.5 *quat2rotm(result_delta_q)* R_a_1_x * (eye(3) - R_w_x * obj.dt) * obj.dt;
-                F(7:9, 7:9) = eye(3);
-                F(7:9, 10:12) = -0.5 * (quat2rotm(obj.delta_q) + quat2rotm(result_delta_q)) *obj.dt;
-                F(7:9, 13:15) = -0.5 * quat2rotm(result_delta_q) * R_a_1_x * obj.dt * -obj.dt;
-                F(10:12, 10:12) = eye(3);
-                F(13:15, 13:15) = eye(3);
-                %cout<<"A"<<endl<<A<<endl;
-                
-                %MatrixXd V = MatrixXd::Zero(15,18);
-                V(1:3,1:3) =  0.25 * quat2rotm(obj.delta_q) * obj.dt * obj.dt;
-                V(1:3, 4:6) =  0.25 * -quat2rotm(result_delta_q) * R_a_1_x  * obj.dt * obj.dt * 0.5 * obj.dt;
-                V(1:3,7:9) =  0.25 * quat2rotm(result_delta_q) * obj.dt * obj.dt;
-                V(1:3, 10:12) =  V(1:3, 4:6);
-                V(4:6, 4:6) =  0.5 * eye(3) * obj.dt;
-                V(4:6, 10:12) =  0.5 * eye(3) * obj.dt;
-                V(7:9, 1:3) =  0.5 * quat2rotm(obj.delta_q) * obj.dt;
-                V(7:9, 4:6) =  0.5 * -quat2rotm(result_delta_q) * R_a_1_x  * obj.dt * 0.5 * obj.dt;
-                V(7:9, 7:9) =  0.5 * quat2rotm(result_delta_q) * obj.dt;
-                V(7:9, 10:12) =  V(7:9, 4:6);
-                V(10:12, 13:15) = eye(3) * obj.dt;
-                V(13:15, 16:18) = eye(3) * obj.dt;
-                
-                %step_jacobian = F;
-                %step_V = V;
-                obj.jacobian = F * obj.jacobian;
-                obj.covariance = F * obj.covariance * F.transpose() + V * obj.noise * V.transpose();
-            end
-        end
-        function setNoise(obj)
-            global ACC_N
-            global GYR_N
-            global ACC_W
-            global GYR_W
-            % ACC_N
-            obj.noise(1:3,1:3)= ACC_N*ACC_N*eye(3);%should be defined global
-            obj.noise(4:6,4:6)= GYR_N*GYR_N*eye(3);
-            obj.noise(7:9,7:9)= ACC_N*ACC_N*eye(3);
-            obj.noise(10:12,10:12)= GYR_N*GYR_N*eye(3);
-            obj.noise(13:15,13:15)= ACC_W*ACC_W*eye(3);
-            obj.noise(16:18,16:18)= GYR_W*GYR_W*eye(3);
-        end
     end
 end

@@ -10,6 +10,7 @@
 #include <Eigen\Dense>
 
 #include "pose_local_parameterization.h"
+#include "IMUfactor.h"
 
 using namespace std;
 
@@ -167,10 +168,10 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
   
   double Ps[11][3],Rs[3][3][11],Qs[4][11],Vs[11][3],Bas[11][3],Bgs[11][3];
   double dpContainer[10][3],dqContainer[4][10],dvContainer[10][3];
-  double JContainer[15][15][10],PContainer[15][15][10],baContainer[10][3],bgContainer[10][3];
+  double JContainer[10][15][15],PContainer[10][15][15],baContainer[10][3],bgContainer[10][3],dtContainer[10];
   
   double* inMatrix0,*inMatrix1,*inMatrix2,*inMatrix3,*inMatrix4,*inMatrix5,*inMatrix6;
-  double* inMatrix7,*inMatrix8,*inMatrix9,*inMatrix10,*inMatrix11,*inMatrix12;
+  double* inMatrix7,*inMatrix8,*inMatrix9,*inMatrix10,*inMatrix11,*inMatrix12,*inMatrix13;
   
   inMatrix0 = mxGetPr(prhs[0]);
   inMatrix1 = mxGetPr(prhs[1]);
@@ -185,7 +186,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
   inMatrix10 = mxGetPr(prhs[10]);
   inMatrix11 = mxGetPr(prhs[11]);
   inMatrix12 = mxGetPr(prhs[12]);
-  //inMatrix13 = mxGetPr(prhs[13]);
+  inMatrix13 = mxGetPr(prhs[13]);
   
   memcpy(Ps, inMatrix0, sizeof(Ps));
   memcpy(Rs, inMatrix1, sizeof(Rs));
@@ -200,6 +201,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
   memcpy(PContainer, inMatrix10, sizeof(PContainer));
   memcpy(baContainer, inMatrix11, sizeof(baContainer));
   memcpy(bgContainer, inMatrix12, sizeof(bgContainer));
+  memcpy(dtContainer, inMatrix13, sizeof(dtContainer));
   
   for (int i = 0; i <= WINDOW_SIZE; i++)
     {
@@ -300,106 +302,141 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
       {
         for (int k = 0; k < 15; k++)
         {
-                  //jacobian[i]<<JContainer[k][j][i];
-                  cout<<JContainer[k][j][i]<<" ";
+                  jacobian[i](j,k)=JContainer[i][k][j];
+                  covariance[i](j,k)=PContainer[i][k][j];
+                  //jacobian[i]<<k;  
+//                   cout<<JContainer[i][k][j]<<" ";
+//                   if(k==14){cout<<endl;}
         }
       }
-
   }
-  //cout<<jacobian[0]<<endl;
+  //cout<<endl<<jacobian[4]<<endl;
+//   cout<<endl<<covariance[0]<<endl;
+//   cout<<endl<<covariance[4]<<endl;
+//   cout<<endl<<covariance[9]<<endl;
+
 //   for (int i = 0; i < WINDOW_SIZE; i++)
 //   {
 //       cout<<jacobian[i]<<endl<<" "<<endl;
 //   }
-          
-//   Eigen::Vector3d dp0(dpContainer[0]);
-//   Eigen::Vector3d dp1(dpContainer[1]);
-//   Eigen::Vector3d dp2(dpContainer[2]);
-//   Eigen::Vector3d dp3(dpContainer[3]);
-//   Eigen::Vector3d dp4(dpContainer[4]);
-//   Eigen::Vector3d dp5(dpContainer[5]);
-//   Eigen::Vector3d dp6(dpContainer[6]);
-//   Eigen::Vector3d dp7(dpContainer[7]);
-//   Eigen::Vector3d dp8(dpContainer[8]);
-//   Eigen::Vector3d dp9(dpContainer[9]);
-//   Eigen::Vector3d dp10(dpContainer[10]);
-//   dp[0]=dp0;
-//   dp[1]=dp1;
-//   dp[2]=dp0;
-//   dp[3]=dp0;
-//   dp[4]=dp0;
-//   dp[5]=dp0;
-//   dp[6]=dp0;
-//   dp[7]=dp0;
-//   dp[8]=dp0;
-//   dp[9]=dp0;
-//   dp[10]=dp0;
-  
-//   // add residualblocks
+
 //   for (int i = 0; i < WINDOW_SIZE; i++)
-//     {
-//         int j = i + 1;
-// //         if (pre_integrations[j]->sum_dt > 10.0)
-// //             continue;
-//         IMUFactor* imu_factor = new IMUFactor(pre_integrations[j]);
-//         problem.AddResidualBlock(imu_factor, NULL, para_Pose[i], para_SpeedBias[i], para_Pose[j], para_SpeedBias[j]);
-//     }
-# endif  
-#if 0 
-  mxDouble* vin1 = mxGetPr(prhs[0]);
-  mxDouble* vin2 = mxGetPr(prhs[1]);
-  mxDouble* vin3 = mxGetPr(prhs[2]);
+//   {
+//       cout<<dtContainer[i]<<endl<<" "<<endl;
+//   }
   
-  double ar = * vin1, br = * vin2, cr = * vin3;         // 真实参数值
-  double ae = 2.0, be = -1.0, ce = 5.0;        // 估计参数值
-  int N = 100;                                 // 数据点
-  double w_sigma = 1.0;                        // 噪声Sigma值
-  double inv_sigma = 1.0 / w_sigma;
-  //cv::RNG rng;                                 // OpenCV随机数产生器
+  // add residualblocks
+  for (int i = 0; i < WINDOW_SIZE; i++)
+    {
+        int j = i + 1;
+//         if (pre_integrations[j]->sum_dt > 10.0)
+//             continue;
+        IMUFactor* imu_factor = new IMUFactor(dp[j],dq[j],dv[j],ba[j],bg[j],jacobian[j],covariance[j],dtContainer[j]);
+        problem.AddResidualBlock(imu_factor, NULL, para_Pose[i], para_SpeedBias[i], para_Pose[j], para_SpeedBias[j]);
+    }
 
-  vector<double> x_data, y_data;      // 数据
-  for (int i = 0; i < N; i++) {
-    double x = i / 100.0;
-    x_data.push_back(x);
-    y_data.push_back(exp(ar * x * x + br * x + cr));
-    //y_data.push_back(exp(ar * x * x + br * x + cr) + rng.gaussian(w_sigma * w_sigma));
-  }
+  ceres::Solver::Options options;
+  
+  options.linear_solver_type = ceres::DENSE_SCHUR;
+  //options.num_threads = 2;
+  options.trust_region_strategy_type = ceres::DOGLEG;
+  options.max_num_iterations = NUM_ITERATIONS;
+  //options.use_explicit_schur_complement = true;
+  //options.minimizer_progress_to_stdout = true;
+  //options.use_nonmonotonic_steps = true;
+  if (true)//marginalization_flag == MARGIN_OLD
+      options.max_solver_time_in_seconds = SOLVER_TIME * 4.0 / 5.0;
+  else
+      options.max_solver_time_in_seconds = SOLVER_TIME;
 
-  double abc[3] = {ae, be, ce};
-
-  // 构建最小二乘问题
-  ceres::Problem problem;
-  for (int i = 0; i < N; i++) {
-    problem.AddResidualBlock(     // 向问题中添加误差项
-      // 使用自动求导，模板参数：误差类型，输出维度，输入维度，维数要与前面struct中一致
-      new ceres::AutoDiffCostFunction<CURVE_FITTING_COST, 1, 3>(
-        new CURVE_FITTING_COST(x_data[i], y_data[i])
-      ),
-      nullptr,            // 核函数，这里不使用，为空
-      abc                 // 待估计参数
-    );
-  }
-
-  // 配置求解器
-  ceres::Solver::Options options;     // 这里有很多配置项可以填
-  options.linear_solver_type = ceres::DENSE_NORMAL_CHOLESKY;  // 增量方程如何求解
-  options.minimizer_progress_to_stdout = true;   // 输出到cout
-
-  ceres::Solver::Summary summary;                // 优化信息
+  ceres::Solver::Summary summary;
   chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
-  ceres::Solve(options, &problem, &summary);  // 开始优化
+  ceres::Solve(options, &problem, &summary);
   chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
   chrono::duration<double> time_used = chrono::duration_cast<chrono::duration<double>>(t2 - t1);
   cout << "solve time cost = " << time_used.count() << " seconds. " << endl;
-
-  // 输出结果
-//   cout << summary.BriefReport() << endl;
-//   cout << "estimated a,b,c = ";
-//   for (auto a:abc) cout << a << " ";
-//   cout << endl;
-   plhs[0] = mxCreateDoubleMatrix(1, 3, mxREAL);
-   double *_ptr = (double*)mxGetPr(plhs[0]); // 获取矩阵数据指针
-   memcpy(_ptr, abc, sizeof(double)*3);
-#endif  
+  
+  plhs[0] = mxCreateDoubleMatrix(WINDOW_SIZE + 1,SIZE_POSE, mxREAL);
+  double *_ptr0 = (double*)mxGetPr(plhs[0]); // 获取矩阵数据指针
+  memcpy(_ptr0, para_Pose, sizeof(para_Pose));
+  plhs[1] = mxCreateDoubleMatrix(WINDOW_SIZE + 1,SIZE_SPEEDBIAS, mxREAL);
+  double *_ptr1 = (double*)mxGetPr(plhs[1]); // 获取矩阵数据指针
+  memcpy(_ptr1, para_SpeedBias, sizeof(para_SpeedBias));
+  
+  for(mwSize i=0;i<WINDOW_SIZE + 1;i++){
+      for (mwSize j=0;j<SIZE_POSE;j++){
+          cout<<para_Pose[i][j]<<" ";
+          if(j==SIZE_POSE-1){
+              cout<<"\n";
+          }
+      }
+  }
+  for(mwSize i=0;i<WINDOW_SIZE + 1;i++){
+      for (mwSize j=0;j<SIZE_SPEEDBIAS;j++){
+          cout<<para_SpeedBias[i][j]<<" ";
+          if(j==SIZE_SPEEDBIAS-1){
+              cout<<"\n";
+          }
+      }
+  }
+  
+# endif  
+  
+// #if 0 
+//   mxDouble* vin1 = mxGetPr(prhs[0]);
+//   mxDouble* vin2 = mxGetPr(prhs[1]);
+//   mxDouble* vin3 = mxGetPr(prhs[2]);
+//   
+//   double ar = * vin1, br = * vin2, cr = * vin3;         // 真实参数值
+//   double ae = 2.0, be = -1.0, ce = 5.0;        // 估计参数值
+//   int N = 100;                                 // 数据点
+//   double w_sigma = 1.0;                        // 噪声Sigma值
+//   double inv_sigma = 1.0 / w_sigma;
+//   //cv::RNG rng;                                 // OpenCV随机数产生器
+// 
+//   vector<double> x_data, y_data;      // 数据
+//   for (int i = 0; i < N; i++) {
+//     double x = i / 100.0;
+//     x_data.push_back(x);
+//     y_data.push_back(exp(ar * x * x + br * x + cr));
+//     //y_data.push_back(exp(ar * x * x + br * x + cr) + rng.gaussian(w_sigma * w_sigma));
+//   }
+// 
+//   double abc[3] = {ae, be, ce};
+// 
+//   // 构建最小二乘问题
+//   ceres::Problem problem;
+//   for (int i = 0; i < N; i++) {
+//     problem.AddResidualBlock(     // 向问题中添加误差项
+//       // 使用自动求导，模板参数：误差类型，输出维度，输入维度，维数要与前面struct中一致
+//       new ceres::AutoDiffCostFunction<CURVE_FITTING_COST, 1, 3>(
+//         new CURVE_FITTING_COST(x_data[i], y_data[i])
+//       ),
+//       nullptr,            // 核函数，这里不使用，为空
+//       abc                 // 待估计参数
+//     );
+//   }
+// 
+//   // 配置求解器
+//   ceres::Solver::Options options;     // 这里有很多配置项可以填
+//   options.linear_solver_type = ceres::DENSE_NORMAL_CHOLESKY;  // 增量方程如何求解
+//   options.minimizer_progress_to_stdout = true;   // 输出到cout
+// 
+//   ceres::Solver::Summary summary;                // 优化信息
+//   chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
+//   ceres::Solve(options, &problem, &summary);  // 开始优化
+//   chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
+//   chrono::duration<double> time_used = chrono::duration_cast<chrono::duration<double>>(t2 - t1);
+//   cout << "solve time cost = " << time_used.count() << " seconds. " << endl;
+// 
+//   // 输出结果
+// //   cout << summary.BriefReport() << endl;
+// //   cout << "estimated a,b,c = ";
+// //   for (auto a:abc) cout << a << " ";
+// //   cout << endl;
+//    plhs[0] = mxCreateDoubleMatrix(1, 3, mxREAL);
+//    double *_ptr = (double*)mxGetPr(plhs[0]); // 获取矩阵数据指针
+//    memcpy(_ptr, abc, sizeof(double)*3);
+// #endif  
 //  return 0;
 }
