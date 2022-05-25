@@ -15,21 +15,6 @@
 using namespace std;
 
 // 代价函数的计算模型
-struct CURVE_FITTING_COST {
-  CURVE_FITTING_COST(double x, double y) : _x(x), _y(y) {}
-
-  // 残差的计算
-  template<typename T>
-  bool operator()(
-    const T *const abc, // 模型参数，有3维
-    T *residual) const {
-    residual[0] = T(_y) - ceres::exp(abc[0] * T(_x) * T(_x) + abc[1] * T(_x) + abc[2]); // y-exp(ax^2+bx+c)
-    return true;
-  }
-
-  const double _x, _y;    // x,y数据
-};
-
 
 const int WINDOW_SIZE = 10;
 const int SIZE_POSE = 7;
@@ -227,18 +212,25 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
         para_SpeedBias[i][8] = Bgs[i][2];
     }
   
+//   for (int i = 0; i <= WINDOW_SIZE; i++)
+//     {
+//         for (int j = 3; j <= 8; j++){
+//             cout<<para_SpeedBias[i][j]<<endl;
+//         }
+//     }
+  
   ceres::Problem problem;
 //   ceres::LossFunction *loss_function;
 //   //loss_function = new ceres::HuberLoss(1.0);
 //   loss_function = new ceres::CauchyLoss(1.0);
   
   // add paramterblocks
-//   for (int i = 0; i < WINDOW_SIZE + 1; i++)
-//   {// localparameterization for quanternion https://groups.google.com/g/ceres-solver/c/7HfF6DnCv7o
-//       ceres::LocalParameterization *local_parameterization = new PoseLocalParameterization();
-//       problem.AddParameterBlock(para_Pose[i], SIZE_POSE, local_parameterization);
-//       problem.AddParameterBlock(para_SpeedBias[i], SIZE_SPEEDBIAS);
-//   }
+  for (int i = 0; i < WINDOW_SIZE + 1; i++)
+  {// localparameterization for quanternion https://groups.google.com/g/ceres-solver/c/7HfF6DnCv7o
+      ceres::LocalParameterization *local_parameterization = new PoseLocalParameterization();
+      problem.AddParameterBlock(para_Pose[i], SIZE_POSE, local_parameterization);
+      problem.AddParameterBlock(para_SpeedBias[i], SIZE_SPEEDBIAS);
+  }
   
   // save parameters into eigen matrix/vector
   Eigen::Vector3d dp[WINDOW_SIZE];
@@ -289,9 +281,11 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
       //dp[0]<<1,2,3;
       bg[i]<<bgContainer[i][0],bgContainer[i][1],bgContainer[i][2];
   }
+  
 //   for (int i = 0; i < WINDOW_SIZE; i++)
 //   {
-//       cout<<dv[i]<<endl<<" "<<endl;
+//       cout<<"ba:"<<ba[i]<<endl<<" "<<endl;
+//       cout<<"bg:"<<bg[i]<<endl<<" "<<endl;
 //   }
       
   Eigen::Matrix<double, 15, 15> jacobian[WINDOW_SIZE];
@@ -310,7 +304,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
         }
       }
   }
-  //cout<<endl<<jacobian[4]<<endl;
+  //cout<<endl<<jacobian[2]<<endl;
 //   cout<<endl<<covariance[0]<<endl;
 //   cout<<endl<<covariance[4]<<endl;
 //   cout<<endl<<covariance[9]<<endl;
@@ -324,14 +318,15 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 //   {
 //       cout<<dtContainer[i]<<endl<<" "<<endl;
 //   }
-  
+# if 1  
   // add residualblocks
   for (int i = 0; i < WINDOW_SIZE; i++)
     {
         int j = i + 1;
 //         if (pre_integrations[j]->sum_dt > 10.0)
 //             continue;
-        IMUFactor* imu_factor = new IMUFactor(dp[j],dq[j],dv[j],ba[j],bg[j],jacobian[j],covariance[j],dtContainer[j]);
+        // vins里面imufactor一共十一个取后十个，我们这里matlab直接给了后十个
+        IMUFactor* imu_factor = new IMUFactor(dp[i],dq[i],dv[i],ba[i],bg[i],jacobian[i],covariance[i],dtContainer[i]);
         problem.AddResidualBlock(imu_factor, NULL, para_Pose[i], para_SpeedBias[i], para_Pose[j], para_SpeedBias[j]);
     }
 
@@ -342,7 +337,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
   options.trust_region_strategy_type = ceres::DOGLEG;
   options.max_num_iterations = NUM_ITERATIONS;
   //options.use_explicit_schur_complement = true;
-  //options.minimizer_progress_to_stdout = true;
+  options.minimizer_progress_to_stdout = true;
   //options.use_nonmonotonic_steps = true;
   if (true)//marginalization_flag == MARGIN_OLD
       options.max_solver_time_in_seconds = SOLVER_TIME * 4.0 / 5.0;
@@ -356,29 +351,33 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
   chrono::duration<double> time_used = chrono::duration_cast<chrono::duration<double>>(t2 - t1);
   cout << "solve time cost = " << time_used.count() << " seconds. " << endl;
   
+  // 输出结果
+//   cout << summary.BriefReport() << endl;
+  cout << summary.FullReport() << endl;
+  
   plhs[0] = mxCreateDoubleMatrix(WINDOW_SIZE + 1,SIZE_POSE, mxREAL);
   double *_ptr0 = (double*)mxGetPr(plhs[0]); // 获取矩阵数据指针
   memcpy(_ptr0, para_Pose, sizeof(para_Pose));
   plhs[1] = mxCreateDoubleMatrix(WINDOW_SIZE + 1,SIZE_SPEEDBIAS, mxREAL);
   double *_ptr1 = (double*)mxGetPr(plhs[1]); // 获取矩阵数据指针
   memcpy(_ptr1, para_SpeedBias, sizeof(para_SpeedBias));
-  
-  for(mwSize i=0;i<WINDOW_SIZE + 1;i++){
-      for (mwSize j=0;j<SIZE_POSE;j++){
-          cout<<para_Pose[i][j]<<" ";
-          if(j==SIZE_POSE-1){
-              cout<<"\n";
-          }
-      }
-  }
-  for(mwSize i=0;i<WINDOW_SIZE + 1;i++){
-      for (mwSize j=0;j<SIZE_SPEEDBIAS;j++){
-          cout<<para_SpeedBias[i][j]<<" ";
-          if(j==SIZE_SPEEDBIAS-1){
-              cout<<"\n";
-          }
-      }
-  }
+# endif
+//   for(mwSize i=0;i<WINDOW_SIZE + 1;i++){
+//       for (mwSize j=0;j<SIZE_POSE;j++){
+//           cout<<para_Pose[i][j]<<" ";
+//           if(j==SIZE_POSE-1){
+//               cout<<"\n";
+//           }
+//       }
+//   }
+//   for(mwSize i=0;i<WINDOW_SIZE + 1;i++){
+//       for (mwSize j=0;j<SIZE_SPEEDBIAS;j++){
+//           cout<<para_SpeedBias[i][j]<<" ";
+//           if(j==SIZE_SPEEDBIAS-1){
+//               cout<<"\n";
+//           }
+//       }
+//   }
   
 # endif  
   

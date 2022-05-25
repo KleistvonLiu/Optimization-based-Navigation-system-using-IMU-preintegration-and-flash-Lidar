@@ -63,6 +63,7 @@ class IMUFactor : public ceres::SizedCostFunction<15, 7, 9, 7, 9>
         Eigen::Map<Eigen::Matrix<double, 15, 1>> residual(residuals);
 //         residual = pre_integration->evaluate(Pi, Qi, Vi, Bai, Bgi,
 //                                             Pj, Qj, Vj, Baj, Bgj);
+        Eigen::Matrix<double, 15, 1> temp_residuals;
         Eigen::Matrix3d dp_dba = jacobian.block<3, 3>(O_P, O_BA);// derivatives dp/dba, position/acc bias
         Eigen::Matrix3d dp_dbg = jacobian.block<3, 3>(O_P, O_BG);
 
@@ -74,21 +75,24 @@ class IMUFactor : public ceres::SizedCostFunction<15, 7, 9, 7, 9>
         Eigen::Vector3d dba = Bai - ba;
         Eigen::Vector3d dbg = Bgi - bg;
         // 三个预积分变量通过bias更新
+        //std::cout<<"Bai:"<<Bai<<std::endl<<"Bgi:"<<Bgi<<std::endl;
+        //std::cout<<"dv:"<<dv<<std::endl<<dv_dba<<std::endl<<dba<<std::endl<<dv_dbg<<std::endl<<Bgi<<std::endl<<bg<<std::endl;
         Eigen::Quaterniond corrected_delta_q = dq * Utility::deltaQ(dq_dbg * dbg);//corrected_delta_q is q_bibj
         Eigen::Vector3d corrected_delta_v = dv + dv_dba * dba + dv_dbg * dbg;//corrected_delta_v is beta_bibj
         Eigen::Vector3d corrected_delta_p = dp + dp_dba * dba + dp_dbg * dbg;//corrected_delta_p is alpha_bibj
-
-        residual.block<3, 1>(O_P, 0) = Qi.inverse() * (0.5 * G * dt * dt + Pj - Pi - Vi * dt) - corrected_delta_p;
-        residual.block<3, 1>(O_R, 0) = 2 * (corrected_delta_q.inverse() * (Qi.inverse() * Qj)).vec();
-        residual.block<3, 1>(O_V, 0) = Qi.inverse() * (G * dt + Vj - Vi) - corrected_delta_v;
-        residual.block<3, 1>(O_BA, 0) = Baj - Bai;
-        residual.block<3, 1>(O_BG, 0) = Bgj - Bgi;
-        
-        
+        //std::cout<<"corrected dv:"<<corrected_delta_v<<std::endl;
+        temp_residuals.block<3, 1>(O_P, 0) = Qi.inverse() * (0.5 * G * dt * dt + Pj - Pi - Vi * dt) - corrected_delta_p;
+        temp_residuals.block<3, 1>(O_R, 0) = 2 * (corrected_delta_q.inverse() * (Qi.inverse() * Qj)).vec();
+        temp_residuals.block<3, 1>(O_V, 0) = Qi.inverse() * (G * dt + Vj - Vi) - corrected_delta_v;
+        temp_residuals.block<3, 1>(O_BA, 0) = Baj - Bai;
+        temp_residuals.block<3, 1>(O_BG, 0) = Bgj - Bgi;
+        //std::cout<<"state dv:"<<Qi.inverse() * (G * dt + Vj - Vi)<<std::endl;
+        residual = temp_residuals;
+        //std::cout<<1<<std::endl<<residual<<std::endl<<2<<std::endl;
         Eigen::Matrix<double, 15, 15> sqrt_info = Eigen::LLT<Eigen::Matrix<double, 15, 15>>(covariance.inverse()).matrixL().transpose();
         //sqrt_info.setIdentity();
         residual = sqrt_info * residual;
-
+        //std::cout<<residual<<std::endl;
         if (jacobians)//求r关于状态变量x的J，r是15维，x分了四块，维度分别是7 9 7 9，J应该是要给ceres
         {
             double sum_dt = dt;

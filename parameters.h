@@ -1,6 +1,6 @@
 #include <Eigen\Dense>
 
-Eigen::Vector3d G{0.0, 0.0, 9.8};
+Eigen::Vector3d G{0.0, 0.0, 0.0};
 enum StateOrder
 {
     O_P = 0,
@@ -18,5 +18,5 @@ enum NoiseOrder
     O_GW = 9
 };
 
-double SOLVER_TIME = 0.05;
-int NUM_ITERATIONS = 10;
+double SOLVER_TIME = 1.0;
+int NUM_ITERATIONS = 20;
