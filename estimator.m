@@ -295,6 +295,8 @@ classdef estimator < handle
             obj.Rs(:,:,1:obj.window_size) =obj.Rs(:,:,2:end);
             obj.Ps(:,1:obj.window_size) =obj.Ps(:,2:end);
             obj.Vs(:,1:obj.window_size) =obj.Vs(:,2:end);
+            obj.Bas(:,1:obj.window_size) =obj.Bas(:,2:end);
+            obj.Bgs(:,1:obj.window_size) =obj.Bgs(:,2:end);
             
             obj.pre_integrations(1) = [];
         end

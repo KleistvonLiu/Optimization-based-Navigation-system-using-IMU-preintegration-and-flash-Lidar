@@ -339,6 +339,10 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
   //options.use_explicit_schur_complement = true;
   options.minimizer_progress_to_stdout = true;
   //options.use_nonmonotonic_steps = true;
+  // JF edited
+//   options.gradient_tolerance = 1e-25;
+//   options.parameter_tolerance = 1e-20;
+  
   if (true)//marginalization_flag == MARGIN_OLD
       options.max_solver_time_in_seconds = SOLVER_TIME * 4.0 / 5.0;
   else

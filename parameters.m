@@ -23,10 +23,16 @@ global GYR_N
 global ACC_W
 global GYR_W
 global g
-ACC_N=0.08;
-GYR_N=0.004;
-ACC_W=0.00004;
-GYR_W=2.0e-6;
+% value from vins
+% ACC_N=0.08;%
+% GYR_N=0.004;
+% ACC_W=0.00004;
+% GYR_W=2.0e-6;
+% value used by us
+ACC_N=1e-10;%
+GYR_N=1e-10;
+ACC_W=1e-5;
+GYR_W=1e-5;
 g = [0;0;0];% 0 for IMUmeas data
 
 % #loop closure parameters

@@ -125,14 +125,14 @@ classdef IntegrationBase < handle
                     -0.5 *quat2rotm(result_delta_q)* R_a_1_x * (eye(3) - R_w_x * obj.dt) * obj.dt;
                 F(7:9, 7:9) = eye(3);
                 F(7:9, 10:12) = -0.5 * (quat2rotm(obj.delta_q) + quat2rotm(result_delta_q)) *obj.dt;
-                F(7:9, 13:15) = -0.5 * quat2rotm(result_delta_q) * R_a_1_x * obj.dt * -obj.dt;
+                F(7:9, 13:15) = -0.5 * quat2rotm(result_delta_q) * R_a_1_x * obj.dt * (-obj.dt);
                 F(10:12, 10:12) = eye(3);
                 F(13:15, 13:15) = eye(3);
                 %cout<<"A"<<endl<<A<<endl;
                 
                 %MatrixXd V = MatrixXd::Zero(15,18);
                 V(1:3,1:3) =  0.25 * quat2rotm(obj.delta_q) * obj.dt * obj.dt;
-                V(1:3, 4:6) =  0.25 * -quat2rotm(result_delta_q) * R_a_1_x  * obj.dt * obj.dt * 0.5 * obj.dt;
+                V(1:3, 4:6) =  0.25 * (-quat2rotm(result_delta_q)) * R_a_1_x  * obj.dt * obj.dt * 0.5 * obj.dt;
                 V(1:3,7:9) =  0.25 * quat2rotm(result_delta_q) * obj.dt * obj.dt;
                 V(1:3, 10:12) =  V(1:3, 4:6);
                 V(4:6, 4:6) =  0.5 * eye(3) * obj.dt;
