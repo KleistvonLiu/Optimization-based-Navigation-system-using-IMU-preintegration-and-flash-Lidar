@@ -81,19 +81,12 @@ for i = 1:enddata
         %e.ProcessPC(pc,params);
         e2.testProcessPC(flag,c);
         
-%         index = min(window_size,floor(i/step)+1);
-%         Rs(:,:,floor(i/step)+1) =e.Rs(:,:,index);
-%         Ps(:,floor(i/step)+1) =e.Ps(:,index);
-%         Vs(:,floor(i/step)+1) =e.Ps(:,index);
-%         Bas(:,floor(i/step)+1) =e.Bas(:,index);
-%         Bgs(:,floor(i/step)+1) =e.Bgs(:,index);
-        
         index = min(window_size,floor(i/step)+1);
-        Rs(:,:,floor(i/step)+1) =e2.Rs(:,:,index);
-        Ps(:,floor(i/step)+1) =e2.Ps(:,index);
-        Vs(:,floor(i/step)+1) =e2.Ps(:,index);
-        Bas(:,floor(i/step)+1) =e2.Bas(:,index);
-        Bgs(:,floor(i/step)+1) =e2.Bgs(:,index);
+        Rs(:,:,floor(i/step)+1) =e.Rs(:,:,index);
+        Ps(:,floor(i/step)+1) =e.Ps(:,index);
+        Vs(:,floor(i/step)+1) =e.Ps(:,index);
+        Bas(:,floor(i/step)+1) =e.Bas(:,index);
+        Bgs(:,floor(i/step)+1) =e.Bgs(:,index);
     end
     
 %     if i < datastep

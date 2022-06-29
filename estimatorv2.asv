@@ -1,4 +1,4 @@
-classdef estimator < handle
+classdef estimatorv2 < handle
     properties
         
         %         acc_1;
@@ -59,7 +59,7 @@ classdef estimator < handle
     end
     methods
         %!these 4 variables should be references
-        function obj = estimator(window_size)
+        function obj = estimatorv2(window_size)
             if nargin == 1
                 obj.window_size = window_size;
             else
@@ -68,7 +68,8 @@ classdef estimator < handle
             obj.Ps = zeros(3,obj.window_size+1);
             obj.Vs = zeros(3,obj.window_size+1);
             obj.Rs = repmat(eye(3),1,1,obj.window_size+1);
-            obj.Qs = quaternion(rand(obj.window_size+1,4));
+            %obj.Qs = quaternion(rand(obj.window_size+1,4));
+            obj.Qs = zeros(4,obj.window_size+1);
             obj.Bas = zeros(3,obj.window_size+1);
             obj.Bgs = zeros(3,obj.window_size+1);
             obj.first_imu = false;
@@ -80,7 +81,7 @@ classdef estimator < handle
             obj.new_frame = 0;
             obj.pre_integrations = [];
             
-            %obj.pc = ;
+            % obj.pc = ;
             obj.Timu = repmat(eye(4),1,1,obj.window_size);
             
             obj.dpContainer = zeros(3,obj.window_size);%3*10
@@ -118,7 +119,7 @@ classdef estimator < handle
             end
             % 注意此处是使用上一个历元的IMU数据!因此first_imu的设置还是有作用的
             if (length(obj.pre_integrations)<(obj.frame_count))
-                obj.pre_integrations = [obj.pre_integrations IntegrationBase(obj.acc_0, obj.gyr_0, obj.Bas(obj.frame_count), obj.Bgs(obj.frame_count))];
+                obj.pre_integrations = [obj.pre_integrations IntegrationBasev2(obj.acc_0, obj.gyr_0, obj.Bas(obj.frame_count), obj.Bgs(obj.frame_count))];
             end
             
             
@@ -146,7 +147,7 @@ classdef estimator < handle
                 un_acc_0 = obj.Rs(:,:,j) * (obj.acc_0 - obj.Bas(:,j)) - g;
                 un_gyr = 0.5 * (obj.gyr_0 + angular_velocity) - obj.Bgs(:,j);% !! Bgs(j)
                 un_gyr = un_gyr * dt;
-                obj.Rs(:,:,j) =obj.Rs(:,:,j)*quat2rotm(quaternion(1,un_gyr(1)/2,un_gyr(2)/2,un_gyr(3)/2));
+                obj.Rs(:,:,j) =obj.Rs(:,:,j)*quat2rotmliub([un_gyr(1)/2,un_gyr(2)/2,un_gyr(3)/2,1]).';
                 un_acc_1 = obj.Rs(:,:,j) * (linear_acceleration - obj.Bas(:,j)) - g;% !! Bas(j)
                 un_acc = 0.5 * (un_acc_0 + un_acc_1);
                 obj.Ps(:,j) =obj.Ps(:,j)+ dt * obj.Vs(:,j) + 0.5 * dt * dt * un_acc;
@@ -165,7 +166,7 @@ classdef estimator < handle
             end
             % 注意此处是使用上一个历元的IMU数据!因此first_imu的设置还是有作用的
             if (length(obj.pre_integrations)<(obj.frame_count))
-                obj.pre_integrations = [obj.pre_integrations IntegrationBase(obj.acc_0, obj.gyr_0, obj.Bas(obj.frame_count), obj.Bgs(obj.frame_count))];
+                obj.pre_integrations = [obj.pre_integrations IntegrationBasev2(obj.acc_0, obj.gyr_0, obj.Bas(obj.frame_count), obj.Bgs(obj.frame_count))];
             end
             
             if (obj.frame_count ~= 1)
@@ -183,7 +184,7 @@ classdef estimator < handle
                 un_acc_0 = obj.Rs(:,:,j) * (obj.acc_0 - obj.Bas(:,j)) - g;
                 un_gyr = 0.5 * (obj.gyr_0 + angular_velocity) - obj.Bgs(:,j);% !! Bgs(j)
                 un_gyr = un_gyr * dt;
-                obj.Rs(:,:,j) =obj.Rs(:,:,j)*quat2rotm(quaternion(1,un_gyr(1)/2,un_gyr(2)/2,un_gyr(3)/2));
+                obj.Rs(:,:,j) =obj.Rs(:,:,j)*quat2rotmliub([un_gyr(1)/2,un_gyr(2)/2,un_gyr(3)/2,1]).';
                 un_acc_1 = obj.Rs(:,:,j) * (linear_acceleration - obj.Bas(:,j)) - g;% !! Bas(j)
                 un_acc = 0.5 * (un_acc_0 + un_acc_1);
                 obj.Ps(:,j) =obj.Ps(:,j)+ dt * obj.Vs(:,j) + 0.5 * dt * dt * un_acc;
@@ -236,7 +237,8 @@ classdef estimator < handle
         function optimization(obj)
             %input integrationBase2-11的预积分变量 J and Q also bias，Ps[1-11]
             %Timu 2-11
-            obj.Qs = rotm2quat(obj.Rs);
+            obj.Qs = rotm2quatliub(permute(obj.Rs,[2,1,3]));
+            obj.Qs = obj.Qs
 %             obj.Ps
 %             obj.Rs
 %             obj.Vs
@@ -244,7 +246,8 @@ classdef estimator < handle
 %             obj.Bgs
             for i = 1:obj.window_size
                 obj.dpContainer(:,i) = obj.pre_integrations(i+1).delta_p;%3*10
-                obj.dqContainer(i) = obj.pre_integrations(i+1).delta_q;%10*4
+                %obj.dqContainer(i) = obj.pre_integrations(i+1).delta_q;%10*4
+                obj.dqContainerArray(i,:) = obj.pre_integrations(i+1).delta_q;%10*4
                 obj.dvContainer(:,i) = obj.pre_integrations(i+1).delta_v;%3*10
                 obj.JContainer(:,:,i) = obj.pre_integrations(i+1).jacobian;%15*15*10
                 obj.PContainer(:,:,i) = obj.pre_integrations(i+1).covariance;%15*15*10
@@ -252,7 +255,8 @@ classdef estimator < handle
                 obj.bgContainer(:,i) = obj.pre_integrations(i+1).linearized_bg;%3*10
                 obj.dtContainer(i) = obj.pre_integrations(i+1).sum_dt;%1*10
             end
-                obj.dqContainerArray = compact(obj.dqContainer);
+                % obj.dqContainerArray = compact(obj.dqContainer);%convert quaternion class into array
+                %obj.dqContainerArray = [obj.dqContainerArray(:,2:4) obj.dqContainerArray(:,1)];
                 
             [para_pose,para_speedbias] = ceres_optimization(obj.Ps,obj.Rs,obj.Qs,obj.Vs,obj.Bas,obj.Bgs,...
                 obj.dpContainer,obj.dqContainerArray,obj.dvContainer,obj.JContainer,obj.PContainer,...
@@ -271,18 +275,18 @@ classdef estimator < handle
             
             % 计算初始位置的R的偏移，先用ypr 如果不行，直接算R的差
             origin_R0 = R2ypr(obj.Rs(:,:,1));
-            origin_R00 = R2ypr(quat2rotm(quaternion(para_pose(1,7),para_pose(1,4),para_pose(1,5),para_pose(1,6))));
+            origin_R00 = R2ypr(quat2rotmliub([para_pose(1,4),para_pose(1,5),para_pose(1,6),para_pose(1,7)]).');
             origin_P0 = obj.Ps(:,1);
             y_diff = origin_R0(1) - origin_R00(1);
             rot_diff = eul2rotm([y_diff, 0, 0]);
             if (abs(abs(origin_R0(2)) - 90) < 1.0 || abs(abs(origin_R00(2)) - 90) < 1.0)
                 disp(["euler singular point!"]);
-                rot_diff = obj.Rs(:,:,1) * quat2rotm(quaternion(para_pose(1,7),para_pose(1,4),para_pose(1,5),para_pose(1,6))).';
+                rot_diff = obj.Rs(:,:,1) * quat2rotmliub([para_pose(1,4),para_pose(1,5),para_pose(1,6),para_pose(1,7)]).'.';
             end
             
             for i = 1:obj.window_size+1
            
-                obj.Rs(:,:,i) = rot_diff * quat2rotm(normalize(quaternion(para_pose(i,7),para_pose(i,4),para_pose(i,5),para_pose(i,6))));
+                obj.Rs(:,:,i) = rot_diff * quat2rotmliub([para_pose(i,4),para_pose(i,5),para_pose(i,6),para_pose(i,7)]/norm([para_pose(i,4),para_pose(i,5),para_pose(i,6),para_pose(i,7)])).';
 
                 obj.Ps(:,i) = rot_diff * [para_pose(i,1) - para_pose(1,1);
                                         para_pose(i,2) - para_pose(1,2);
