@@ -145,11 +145,74 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
   cout<<test1.w()<<endl<<test1.vec()<<endl;
 # endif 
   
-# if 1  
-  Eigen::Matrix3d test1;
+# if 1
+  mwSize ninput_dimension0 = mxGetNumberOfDimensions(prhs[16]);
+  const mwSize * input_dimension0 = mxGetDimensions(prhs[16]);
+  cout<<"number of dimensions of fisrt input paramters:"<< ninput_dimension0<<"\n";
+  for(mwSize i=0;i<ninput_dimension0;i++){
+        cout<<input_dimension0[i]<<"\n";}
+  //cout<<"size of fisrt input paramters:"<< input_dimension0<<"\n";
+  double* inMatrix16;
+  inMatrix16 = mxGetPr(prhs[16]);
+  int frame_count;
+  frame_count = *inMatrix16;
+  //memcpy(frame_count, inMatrix16, sizeof(frame_count));
   
-  double para_Pose[WINDOW_SIZE + 1][SIZE_POSE];
-  double para_SpeedBias[WINDOW_SIZE + 1][SIZE_SPEEDBIAS];
+  // cout<<inMatrix1[1][5]<<"\n"; 报错 inMatrix1 是指针不是数组
+  cout<<"frame count:"<<frame_count<<"\n";
+# endif 
+
+# if 1
+  mwSize ninput_dimension15 = mxGetNumberOfDimensions(prhs[14]);
+  const mwSize * input_dimension15 = mxGetDimensions(prhs[14]);
+  cout<<"number of dimensions of 15th input paramters:"<< ninput_dimension15<<"\n";
+  for(mwSize i=0;i<ninput_dimension15;i++){
+        cout<<input_dimension15[i]<<"\n";}
+  //cout<<"size of fisrt input paramters:"<< input_dimension0<<"\n";
+  double* inMatrix14;
+  inMatrix14 = mxGetPr(prhs[14]);
+  double deltaT2last[WINDOW_SIZE][7];
+  memcpy(deltaT2last, inMatrix14, sizeof(deltaT2last));
+  for(mwSize i=0;i<frame_count;i++){
+      for (mwSize j=0;j<7;j++){
+          cout<<deltaT2last[i][j]<<" ";
+          if(j==6){
+              cout<<"\n";
+          }
+      }
+  }
+  // cout<<deltaT2last[1][2]<<"\n";
+  // cout<<Ps[1][5]<<"\n"<<sizeof(Ps)/sizeof(Ps[0])<<sizeof(Ps[0])/sizeof(Ps[0][0])<<"\n";
+# endif
+  
+# if 0
+  mwSize ninput_dimension0 = mxGetNumberOfDimensions(prhs[14]);
+  const mwSize * input_dimension0 = mxGetDimensions(prhs[14]);
+  cout<<"number of dimensions of fisrt input paramters:"<< ninput_dimension0<<"\n";
+  for(mwSize i=0;i<ninput_dimension0;i++){
+        cout<<input_dimension0[i]<<"\n";}
+  //cout<<"size of fisrt input paramters:"<< input_dimension0<<"\n";
+  double* inMatrix1;
+  inMatrix14 = mxGetPr(prhs[14]);
+  double Ps[7][11];
+  memcpy(Ps, inMatrix1, sizeof(Ps));
+  
+  // cout<<inMatrix1[1][5]<<"\n"; 报错 inMatrix1 是指针不是数组
+  //cout<<Ps[1][5]<<"\n"<<sizeof(Ps)/sizeof(Ps[0])<<sizeof(Ps[0])/sizeof(Ps[0][0])<<"\n";
+# endif 
+
+  
+  
+// main function  
+# if 0  
+  // first,get the frame count
+  double* inMatrix16;
+  inMatrix16 = mxGetPr(prhs[16]);
+  int frame_count;
+  frame_count = *inMatrix16;
+  
+  double para_Pose[WINDOW_SIZE+1][SIZE_POSE];
+  double para_SpeedBias[WINDOW_SIZE+1][SIZE_SPEEDBIAS];
   
   double Ps[11][3],Rs[3][3][11],Qs[4][11],Vs[11][3],Bas[11][3],Bgs[11][3];
   double dpContainer[10][3],dqContainer[4][10],dvContainer[10][3];
@@ -225,7 +288,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 //   loss_function = new ceres::CauchyLoss(1.0);
   
   // add paramterblocks
-  for (int i = 0; i < WINDOW_SIZE + 1; i++)
+  for (int i = 0; i < frame_count; i++)
   {// localparameterization for quanternion https://groups.google.com/g/ceres-solver/c/7HfF6DnCv7o
       ceres::LocalParameterization *local_parameterization = new PoseLocalParameterization();
       problem.AddParameterBlock(para_Pose[i], SIZE_POSE, local_parameterization);
@@ -320,7 +383,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 //   }
 # if 1  
   // add residualblocks
-  for (int i = 0; i < WINDOW_SIZE; i++)
+  for (int i = 0; i < frame_count-1; i++)
     {
         int j = i + 1;
 //         if (pre_integrations[j]->sum_dt > 10.0)
@@ -359,10 +422,10 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 //   cout << summary.BriefReport() << endl;
   cout << summary.FullReport() << endl;
   
-  plhs[0] = mxCreateDoubleMatrix(WINDOW_SIZE + 1,SIZE_POSE, mxREAL);
+  plhs[0] = mxCreateDoubleMatrix(WINDOW_SIZE+1,SIZE_POSE, mxREAL);
   double *_ptr0 = (double*)mxGetPr(plhs[0]); // 获取矩阵数据指针
   memcpy(_ptr0, para_Pose, sizeof(para_Pose));
-  plhs[1] = mxCreateDoubleMatrix(WINDOW_SIZE + 1,SIZE_SPEEDBIAS, mxREAL);
+  plhs[1] = mxCreateDoubleMatrix(WINDOW_SIZE+1,SIZE_SPEEDBIAS, mxREAL);
   double *_ptr1 = (double*)mxGetPr(plhs[1]); // 获取矩阵数据指针
   memcpy(_ptr1, para_SpeedBias, sizeof(para_SpeedBias));
 # endif
