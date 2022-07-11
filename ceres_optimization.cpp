@@ -11,6 +11,7 @@
 
 #include "pose_local_parameterization.h"
 #include "IMUfactor.h"
+#include "PCfactor.h"
 
 using namespace std;
 
@@ -126,7 +127,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 # endif 
   
    // check if dqContainer stores corretc values
-# if 0
+# if 1
   double* inMatrix7;
   inMatrix7 = mxGetPr(prhs[7]);
   double dqContainer[4][10];
@@ -145,24 +146,22 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
   cout<<test1.w()<<endl<<test1.vec()<<endl;
 # endif 
   
-# if 1
+# if 0
   mwSize ninput_dimension0 = mxGetNumberOfDimensions(prhs[16]);
   const mwSize * input_dimension0 = mxGetDimensions(prhs[16]);
   cout<<"number of dimensions of fisrt input paramters:"<< ninput_dimension0<<"\n";
   for(mwSize i=0;i<ninput_dimension0;i++){
         cout<<input_dimension0[i]<<"\n";}
-  //cout<<"size of fisrt input paramters:"<< input_dimension0<<"\n";
+
   double* inMatrix16;
   inMatrix16 = mxGetPr(prhs[16]);
   int frame_count;
   frame_count = *inMatrix16;
-  //memcpy(frame_count, inMatrix16, sizeof(frame_count));
-  
-  // cout<<inMatrix1[1][5]<<"\n"; 报错 inMatrix1 是指针不是数组
+
   cout<<"frame count:"<<frame_count<<"\n";
 # endif 
 
-# if 1
+# if 0
   mwSize ninput_dimension15 = mxGetNumberOfDimensions(prhs[14]);
   const mwSize * input_dimension15 = mxGetDimensions(prhs[14]);
   cout<<"number of dimensions of 15th input paramters:"<< ninput_dimension15<<"\n";
@@ -171,38 +170,57 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
   //cout<<"size of fisrt input paramters:"<< input_dimension0<<"\n";
   double* inMatrix14;
   inMatrix14 = mxGetPr(prhs[14]);
-  double deltaT2last[WINDOW_SIZE][7];
-  memcpy(deltaT2last, inMatrix14, sizeof(deltaT2last));
-  for(mwSize i=0;i<frame_count;i++){
+  double icp2last[WINDOW_SIZE][7];
+  memcpy(icp2last, inMatrix14, sizeof(icp2last));
+  for(mwSize i=0;i<frame_count-1;i++){
       for (mwSize j=0;j<7;j++){
-          cout<<deltaT2last[i][j]<<" ";
+          cout<<icp2last[i][j]<<" ";
           if(j==6){
               cout<<"\n";
           }
       }
   }
-  // cout<<deltaT2last[1][2]<<"\n";
-  // cout<<Ps[1][5]<<"\n"<<sizeof(Ps)/sizeof(Ps[0])<<sizeof(Ps[0])/sizeof(Ps[0][0])<<"\n";
 # endif
   
 # if 0
-  mwSize ninput_dimension0 = mxGetNumberOfDimensions(prhs[14]);
-  const mwSize * input_dimension0 = mxGetDimensions(prhs[14]);
-  cout<<"number of dimensions of fisrt input paramters:"<< ninput_dimension0<<"\n";
-  for(mwSize i=0;i<ninput_dimension0;i++){
-        cout<<input_dimension0[i]<<"\n";}
+  mwSize ninput_dimension16 = mxGetNumberOfDimensions(prhs[15]);
+  const mwSize * input_dimension16 = mxGetDimensions(prhs[15]);
+  cout<<"number of dimensions of fisrt input paramters:"<< ninput_dimension16<<"\n";
+  for(mwSize i=0;i<ninput_dimension16;i++){
+        cout<<input_dimension16[i]<<"\n";}
   //cout<<"size of fisrt input paramters:"<< input_dimension0<<"\n";
-  double* inMatrix1;
-  inMatrix14 = mxGetPr(prhs[14]);
-  double Ps[7][11];
-  memcpy(Ps, inMatrix1, sizeof(Ps));
+  double* inMatrix15;
+  inMatrix15 = mxGetPr(prhs[15]);
+  double icp2base[7];
+  // icp2base = *inMatrix15;
+  memcpy(icp2base, inMatrix15, sizeof(icp2base));
+  for(mwSize i=0;i<7;i++){
+      cout<<icp2base[i]<<" ";
+      cout<<"\n";
+  }
+# endif    
   
-  // cout<<inMatrix1[1][5]<<"\n"; 报错 inMatrix1 是指针不是数组
-  //cout<<Ps[1][5]<<"\n"<<sizeof(Ps)/sizeof(Ps[0])<<sizeof(Ps[0])/sizeof(Ps[0][0])<<"\n";
-# endif 
+# if 0
+  mwSize ninput_dimension17 = mxGetNumberOfDimensions(prhs[17]);
+  const mwSize * input_dimension17 = mxGetDimensions(prhs[17]);
+  cout<<"number of dimensions of 18th input paramters:"<< ninput_dimension17<<"\n";
+  for(mwSize i=0;i<ninput_dimension17;i++){
+        cout<<input_dimension17[i]<<"\n";}
+  //cout<<"size of fisrt input paramters:"<< input_dimension0<<"\n";
+  double* inMatrix17;
+  inMatrix17 = mxGetPr(prhs[17]);
+  double g_sum[WINDOW_SIZE+1][3];
+  memcpy(g_sum, inMatrix17, sizeof(g_sum));
+  for(mwSize i=0;i<frame_count;i++){
+      for (mwSize j=0;j<3;j++){
+          cout<<g_sum[i][j]<<" ";
+          if(j==2){
+              cout<<"\n";
+          }
+      }
+  }
+# endif
 
-  
-  
 // main function  
 # if 0  
   // first,get the frame count
@@ -217,9 +235,11 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
   double Ps[11][3],Rs[3][3][11],Qs[4][11],Vs[11][3],Bas[11][3],Bgs[11][3];
   double dpContainer[10][3],dqContainer[4][10],dvContainer[10][3];
   double JContainer[10][15][15],PContainer[10][15][15],baContainer[10][3],bgContainer[10][3],dtContainer[10];
-  
+  double icp2last[WINDOW_SIZE][7], icp2base[7],g_sum[WINDOW_SIZE+1][3];
+
   double* inMatrix0,*inMatrix1,*inMatrix2,*inMatrix3,*inMatrix4,*inMatrix5,*inMatrix6;
   double* inMatrix7,*inMatrix8,*inMatrix9,*inMatrix10,*inMatrix11,*inMatrix12,*inMatrix13;
+  double* inMatrix14,*inMatrix15, *inMatrix17;
   
   inMatrix0 = mxGetPr(prhs[0]);
   inMatrix1 = mxGetPr(prhs[1]);
@@ -235,7 +255,10 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
   inMatrix11 = mxGetPr(prhs[11]);
   inMatrix12 = mxGetPr(prhs[12]);
   inMatrix13 = mxGetPr(prhs[13]);
-  
+  inMatrix14 = mxGetPr(prhs[14]);
+  inMatrix15 = mxGetPr(prhs[15]);
+  inMatrix17 = mxGetPr(prhs[17]);
+
   memcpy(Ps, inMatrix0, sizeof(Ps));
   memcpy(Rs, inMatrix1, sizeof(Rs));
   memcpy(Qs, inMatrix2, sizeof(Qs));
@@ -250,6 +273,9 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
   memcpy(baContainer, inMatrix11, sizeof(baContainer));
   memcpy(bgContainer, inMatrix12, sizeof(bgContainer));
   memcpy(dtContainer, inMatrix13, sizeof(dtContainer));
+  memcpy(icp2last, inMatrix14, sizeof(icp2last));
+  memcpy(icp2base, inMatrix15, sizeof(icp2base));
+  memcpy(g_sum, inMatrix17, sizeof(g_sum));
   
   for (int i = 0; i <= WINDOW_SIZE; i++)
     {
@@ -381,6 +407,42 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 //   {
 //       cout<<dtContainer[i]<<endl<<" "<<endl;
 //   }
+  
+  Eigen::Vector3d dpICP2last[WINDOW_SIZE];
+  Eigen::Quaterniond dqICP2last[WINDOW_SIZE];
+  Eigen::Vector3d dpICP2base;
+  Eigen::Quaterniond dqICP2base;
+  for (int i = 0; i < WINDOW_SIZE; i++)
+  {
+      dpICP2last[i]<<icp2last[i][0],icp2last[i][1],icp2last[i][2];
+      dqICP2last[i]= Eigen::Quaterniond(icp2last[i][6],icp2last[i][3],icp2last[i][4],icp2last[i][5]);
+  }
+  dpICP2base<<icp2base[0],icp2base[1],icp2base[2];
+  dqICP2base = Eigen::Quaterniond(icp2base[6],icp2base[3],icp2base[4],icp2base[5]);
+  
+//   for (int i = 0; i < frame_count-1; i++)
+//   {
+//       cout<<dpICP2last[i]<<" "<<endl;
+//       cout<<dqICP2last[i].w()<<endl<<dqICP2last[i].vec()<<endl<<" "<<endl;
+//   }
+//   cout<<dpICP2base<<" "<<endl;
+//   cout<<dqICP2base.w()<<endl<<dqICP2base.vec()<<endl<<" "<<endl;
+  
+    
+  Eigen::Vector3d deltaG_sum[WINDOW_SIZE+1];
+
+  for (int i = 0; i <= WINDOW_SIZE; i++)
+  {
+      deltaG_sum[i]<<g_sum[i][0],g_sum[i][1],g_sum[i][2];
+  }
+  
+//   for (int i = 0; i < frame_count; i++)
+//   {
+//       cout<<deltaG_sum[i]<<" "<<endl;
+//   }
+
+
+  
 # if 1  
   // add residualblocks
   for (int i = 0; i < frame_count-1; i++)
@@ -389,10 +451,26 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 //         if (pre_integrations[j]->sum_dt > 10.0)
 //             continue;
         // vins里面imufactor一共十一个取后十个，我们这里matlab直接给了后十个
-        IMUFactor* imu_factor = new IMUFactor(dp[i],dq[i],dv[i],ba[i],bg[i],jacobian[i],covariance[i],dtContainer[i]);
+        cout<<dp[i]<<endl<<dq[i].w()<<endl<<dq[i].vec()<<endl<<dv[i]<<endl<<ba[i]<<endl<<bg[i]<<endl;
+        cout<<jacobian[i]<<endl<<covariance[i]<<endl<<dtContainer[i]<<endl<<deltaG_sum[j]<<endl;
+        cout<<para_Pose[i]<<endl<<para_SpeedBias[i]<<endl<<para_Pose[j]<<endl<<para_SpeedBias[j]<<endl;
+        IMUFactor* imu_factor = new IMUFactor(dp[i],dq[i],dv[i],ba[i],bg[i],jacobian[i],covariance[i],dtContainer[i],deltaG_sum[j]);
         problem.AddResidualBlock(imu_factor, NULL, para_Pose[i], para_SpeedBias[i], para_Pose[j], para_SpeedBias[j]);
     }
-
+        
+  for (int i = 0; i < frame_count-1; i++)
+    {
+        int j = i + 1;
+//         if (pre_integrations[j]->sum_dt > 10.0)
+//             continue;
+        // vins里面imufactor一共十一个取后十个，我们这里matlab直接给了后十个
+        ceres::CostFunction *cost_function = PCfactor::Create(dpICP2last[i], dqICP2last[i]);
+        problem.AddResidualBlock(cost_function, NULL, para_Pose[i], para_Pose[j]);
+    }
+//   ceres::CostFunction *cost_function_base = PCfactor::Create(dpICP2base, dqICP2base);
+//   problem.AddResidualBlock(cost_function_base, NULL, para_Pose[0], para_Pose[frame_count-1]);
+  
+        
   ceres::Solver::Options options;
   
   options.linear_solver_type = ceres::DENSE_SCHUR;

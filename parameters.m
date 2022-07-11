@@ -22,7 +22,13 @@ global ACC_N
 global GYR_N
 global ACC_W
 global GYR_W
-global g
+%global g
+global posi_TL_T
+global quat_TL
+global angRate_IT_T
+global R_LT;
+global angRate_IL_L;
+%global X_init
 % value from vins
 % ACC_N=0.08;%
 % GYR_N=0.004;
@@ -33,7 +39,13 @@ ACC_N=1e-10;%
 GYR_N=1e-10;
 ACC_W=1e-5;
 GYR_W=1e-5;
-g = [0;0;0];% 0 for IMUmeas data
+%g = [0;0;0];% 0 for IMUmeas data
+posi_TL_T = [2.305084000000000e+03;-2.240640000000000e+02;1.118870000000000e+02];
+quat_TL = [-0.345298814982167;-0.640216195605092;0.274162668854252;0.629068185702923];
+angRate_IT_T = [0;0;1.447205018237420e-04];
+R_LT = quat2rotmliub(quat_TL).'; % coordinate transform from L to T.
+angRate_IL_L = R_LT.' * angRate_IT_T;
+% X_init = [-0.010835766809501;-0.037451635197423;-7.547757199546605;0;0;0;0;0;-0.698100000000000;0.716000000000000];
 
 % #loop closure parameters
 % loop_closure: 1                    # start loop closure

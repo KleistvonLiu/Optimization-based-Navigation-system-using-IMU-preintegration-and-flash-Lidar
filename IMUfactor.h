@@ -15,8 +15,8 @@ class IMUFactor : public ceres::SizedCostFunction<15, 7, 9, 7, 9>
   public:
     IMUFactor() = delete;
     IMUFactor(Eigen::Vector3d dp_,Eigen::Quaterniond dq_,Eigen::Vector3d dv_,Eigen::Vector3d ba_,Eigen::Vector3d bg_,
-            Eigen::Matrix<double, 15, 15> jacobian_,Eigen::Matrix<double, 15, 15> covariance_,double dt_)
-            :dp(dp_),dq(dq_),dv(dv_),ba(ba_),bg(bg_),jacobian(jacobian_),covariance(covariance_),dt(dt_)
+            Eigen::Matrix<double, 15, 15> jacobian_,Eigen::Matrix<double, 15, 15> covariance_,double dt_,Eigen::Vector3d deltaG_sum_)
+            :dp(dp_),dq(dq_),dv(dv_),ba(ba_),bg(bg_),jacobian(jacobian_),covariance(covariance_),dt(dt_),deltaG_sum(deltaG_sum_)
     {
     }
     virtual bool Evaluate(double const *const *parameters, double *residuals, double **jacobians) const
@@ -81,9 +81,9 @@ class IMUFactor : public ceres::SizedCostFunction<15, 7, 9, 7, 9>
         Eigen::Vector3d corrected_delta_v = dv + dv_dba * dba + dv_dbg * dbg;//corrected_delta_v is beta_bibj
         Eigen::Vector3d corrected_delta_p = dp + dp_dba * dba + dp_dbg * dbg;//corrected_delta_p is alpha_bibj
         //std::cout<<"corrected dv:"<<corrected_delta_v<<std::endl;
-        temp_residuals.block<3, 1>(O_P, 0) = Qi.inverse() * (0.5 * G * dt * dt + Pj - Pi - Vi * dt) - corrected_delta_p;
+        temp_residuals.block<3, 1>(O_P, 0) = Qi.inverse() * (-deltaG_sum + Pj - Pi - Vi * dt + W_IL.cross(Vi)*dt*dt) - corrected_delta_p;
         temp_residuals.block<3, 1>(O_R, 0) = 2 * (corrected_delta_q.inverse() * (Qi.inverse() * Qj)).vec();
-        temp_residuals.block<3, 1>(O_V, 0) = Qi.inverse() * (G * dt + Vj - Vi) - corrected_delta_v;
+        temp_residuals.block<3, 1>(O_V, 0) = Qi.inverse() * (-deltaG_sum *2 / 0.1 + Vj - Vi+ W_IL.cross(Vi)*dt*2) - corrected_delta_v;
         temp_residuals.block<3, 1>(O_BA, 0) = Baj - Bai;
         temp_residuals.block<3, 1>(O_BG, 0) = Bgj - Bgi;
         //std::cout<<"state dv:"<<Qi.inverse() * (G * dt + Vj - Vi)<<std::endl;
@@ -141,7 +141,12 @@ class IMUFactor : public ceres::SizedCostFunction<15, 7, 9, 7, 9>
             {
                 Eigen::Map<Eigen::Matrix<double, 15, 9, Eigen::RowMajor>> jacobian_speedbias_i(jacobians[1]);
                 jacobian_speedbias_i.setZero();
-                jacobian_speedbias_i.block<3, 3>(O_P, O_V - O_V) = -Qi.inverse().toRotationMatrix() * sum_dt;
+                Eigen::Matrix3d W_IL_m;
+
+                W_IL_m<<0, -W_IL(2), W_IL(1),
+                        W_IL(2), 0, -W_IL(0),
+                        -W_IL(1), W_IL(0), 0;
+                jacobian_speedbias_i.block<3, 3>(O_P, O_V - O_V) = -Qi.inverse().toRotationMatrix() * sum_dt + Qi.inverse().toRotationMatrix()* W_IL_m * sum_dt * sum_dt;
                 jacobian_speedbias_i.block<3, 3>(O_P, O_BA - O_V) = -dp_dba;
                 jacobian_speedbias_i.block<3, 3>(O_P, O_BG - O_V) = -dp_dbg;
 
@@ -153,7 +158,7 @@ class IMUFactor : public ceres::SizedCostFunction<15, 7, 9, 7, 9>
                 jacobian_speedbias_i.block<3, 3>(O_R, O_BG - O_V) = -Utility::Qleft(Qj.inverse() * Qi * dq).bottomRightCorner<3, 3>() * dq_dbg;
 #endif
 
-                jacobian_speedbias_i.block<3, 3>(O_V, O_V - O_V) = -Qi.inverse().toRotationMatrix();
+                jacobian_speedbias_i.block<3, 3>(O_V, O_V - O_V) = -Qi.inverse().toRotationMatrix()+ Qi.inverse().toRotationMatrix()*W_IL_m* sum_dt* 2;
                 jacobian_speedbias_i.block<3, 3>(O_V, O_BA - O_V) = -dv_dba;
                 jacobian_speedbias_i.block<3, 3>(O_V, O_BG - O_V) = -dv_dbg;
 
@@ -221,4 +226,5 @@ class IMUFactor : public ceres::SizedCostFunction<15, 7, 9, 7, 9>
     Eigen::Matrix<double, 15, 15> jacobian;
     Eigen::Matrix<double, 15, 15> covariance;
     double dt;
+    Eigen::Vector3d deltaG_sum;
 };
