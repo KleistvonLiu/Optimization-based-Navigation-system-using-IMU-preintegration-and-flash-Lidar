@@ -1,6 +1,6 @@
 # Optimization-based-Navigation-system-using-IMU-preintegration-and-flash-Lidar
 
-刘博，这里是github的链接，你试试能不能下载下来，因为我也不是很会用。首先，我必须说明下，代码确实有些乱，因为我还没有整理。比较重要的代码有：
+请试试能不能下载下来，因为我也不是很会用。首先，我必须说明下，代码确实有些乱，因为我还没有整理。比较重要的代码有：
 
 请先把你之前发给我的R q euler angle之间转换的库添加到路径
 
