@@ -34,11 +34,15 @@ global angRate_IL_L;
 % GYR_N=0.004;
 % ACC_W=0.00004;
 % GYR_W=2.0e-6;
-% value used by us
-ACC_N=1e-10;%
-GYR_N=1e-10;
-ACC_W=1e-5;
-GYR_W=1e-5;
+% value used until 11072022
+% ACC_N=1e-10;%
+% GYR_N=1e-10;
+% ACC_W=1e-5;
+% GYR_W=1e-5;
+ACC_N=4.2e-4 * 9.81/sqrt(3600);%
+GYR_N=0.0002 * pi/180/sqrt(3600);
+ACC_W=ACC_N*ACC_N;
+GYR_W=GYR_N*GYR_N;
 %g = [0;0;0];% 0 for IMUmeas data
 posi_TL_T = [2.305084000000000e+03;-2.240640000000000e+02;1.118870000000000e+02];
 quat_TL = [-0.345298814982167;-0.640216195605092;0.274162668854252;0.629068185702923];

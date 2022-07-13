@@ -1,4 +1,3 @@
-%  Build script for "psfFit.m". 
 clear mex % so that we can overwrite the mexw64/mexa64 files
 
 disp('Building testceres')

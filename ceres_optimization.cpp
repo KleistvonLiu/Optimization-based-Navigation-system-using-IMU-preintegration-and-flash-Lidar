@@ -62,13 +62,13 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 # if 0
   double* inMatrix2;
   inMatrix2 = mxGetPr(prhs[2]);
-  double Qs[4][11];
+  double Qs[11][4];
   memcpy(Qs, inMatrix2, sizeof(Qs));
   //cout<<Ps[0][0]<<" "<<Ps[0][1]<<" "<<Ps[0][2]<<" "<<Ps[0][3]<<" "<<Ps[0][4]<<" "<<Ps[0][5]<<" ";
-  for(mwSize i=0;i<4;i++){
-      for (mwSize j=0;j<11;j++){
+  for(mwSize i=0;i<11;i++){
+      for (mwSize j=0;j<4;j++){
         cout<<Qs[i][j]<<" ";
-        if(j==10){
+        if(j==3){
             cout<<"\n";
         }
       }
@@ -127,22 +127,22 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 # endif 
   
    // check if dqContainer stores corretc values
-# if 1
+# if 0
   double* inMatrix7;
   inMatrix7 = mxGetPr(prhs[7]);
-  double dqContainer[4][10];
+  double dqContainer[10][4];
   memcpy(dqContainer, inMatrix7, sizeof(dqContainer));
   //cout<<Ps[0][0]<<" "<<Ps[0][1]<<" "<<Ps[0][2]<<" "<<Ps[0][3]<<" "<<Ps[0][4]<<" "<<Ps[0][5]<<" ";
-  for(mwSize i=0;i<4;i++){
-      for (mwSize j=0;j<10;j++){
+  for(mwSize i=0;i<10;i++){
+      for (mwSize j=0;j<4;j++){
         cout<<dqContainer[i][j]<<" ";
-        if(j==9){
+        if(j==3){
             cout<<"\n";
         }
       }
   }
   Eigen::Quaterniond test1;
-  test1=Eigen::Quaterniond(dqContainer[0][0],dqContainer[1][0],dqContainer[2][0],dqContainer[3][0]);
+  test1=Eigen::Quaterniond(dqContainer[0][0],dqContainer[0][1],dqContainer[0][2],dqContainer[0][3]);
   cout<<test1.w()<<endl<<test1.vec()<<endl;
 # endif 
   
@@ -222,7 +222,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 # endif
 
 // main function  
-# if 0  
+# if 1  
   // first,get the frame count
   double* inMatrix16;
   inMatrix16 = mxGetPr(prhs[16]);
@@ -232,8 +232,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
   double para_Pose[WINDOW_SIZE+1][SIZE_POSE];
   double para_SpeedBias[WINDOW_SIZE+1][SIZE_SPEEDBIAS];
   
-  double Ps[11][3],Rs[3][3][11],Qs[4][11],Vs[11][3],Bas[11][3],Bgs[11][3];
-  double dpContainer[10][3],dqContainer[4][10],dvContainer[10][3];
+  double Ps[11][3],Rs[3][3][11],Qs[11][4],Vs[11][3],Bas[11][3],Bgs[11][3];
+  double dpContainer[10][3],dqContainer[10][4],dvContainer[10][3];
   double JContainer[10][15][15],PContainer[10][15][15],baContainer[10][3],bgContainer[10][3],dtContainer[10];
   double icp2last[WINDOW_SIZE][7], icp2base[7],g_sum[WINDOW_SIZE+1][3];
 
@@ -283,10 +283,10 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
         para_Pose[i][1] = Ps[i][1];
         para_Pose[i][2] = Ps[i][2];
         
-        para_Pose[i][3] = Qs[1][i];
-        para_Pose[i][4] = Qs[2][i];
-        para_Pose[i][5] = Qs[3][i];
-        para_Pose[i][6] = Qs[0][i];
+        para_Pose[i][3] = Qs[i][1];
+        para_Pose[i][4] = Qs[i][2];
+        para_Pose[i][5] = Qs[i][3];
+        para_Pose[i][6] = Qs[i][0];
 
         para_SpeedBias[i][0] = Vs[i][0];
         para_SpeedBias[i][1] = Vs[i][1];
@@ -303,8 +303,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
   
 //   for (int i = 0; i <= WINDOW_SIZE; i++)
 //     {
-//         for (int j = 3; j <= 8; j++){
-//             cout<<para_SpeedBias[i][j]<<endl;
+//         for (int j = 3; j <= 6; j++){
+//             cout<<para_Pose[i][j]<<endl;
 //         }
 //     }
   
@@ -341,7 +341,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
   Eigen::Quaterniond dq[WINDOW_SIZE];
   for (int i = 0; i < WINDOW_SIZE; i++)
   {
-      dq[i]= Eigen::Quaterniond(dqContainer[0][i],dqContainer[1][i],dqContainer[2][i],dqContainer[3][i]);
+      dq[i]= Eigen::Quaterniond(dqContainer[i][0],dqContainer[i][1],dqContainer[i][2],dqContainer[i][3]);
       //dp[0]<<1,2,3;
   }
 //   for (int i = 0; i < WINDOW_SIZE; i++)
@@ -451,9 +451,9 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 //         if (pre_integrations[j]->sum_dt > 10.0)
 //             continue;
         // vins里面imufactor一共十一个取后十个，我们这里matlab直接给了后十个
-        cout<<dp[i]<<endl<<dq[i].w()<<endl<<dq[i].vec()<<endl<<dv[i]<<endl<<ba[i]<<endl<<bg[i]<<endl;
-        cout<<jacobian[i]<<endl<<covariance[i]<<endl<<dtContainer[i]<<endl<<deltaG_sum[j]<<endl;
-        cout<<para_Pose[i]<<endl<<para_SpeedBias[i]<<endl<<para_Pose[j]<<endl<<para_SpeedBias[j]<<endl;
+//         cout<<dp[i]<<endl<<dq[i].w()<<endl<<dq[i].vec()<<endl<<dv[i]<<endl<<ba[i]<<endl<<bg[i]<<endl;
+//         cout<<jacobian[i]<<endl<<covariance[i]<<endl<<dtContainer[i]<<endl<<deltaG_sum[j]<<endl;
+//         cout<<para_Pose[i]<<endl<<para_SpeedBias[i]<<endl<<para_Pose[j]<<endl<<para_SpeedBias[j]<<endl;
         IMUFactor* imu_factor = new IMUFactor(dp[i],dq[i],dv[i],ba[i],bg[i],jacobian[i],covariance[i],dtContainer[i],deltaG_sum[j]);
         problem.AddResidualBlock(imu_factor, NULL, para_Pose[i], para_SpeedBias[i], para_Pose[j], para_SpeedBias[j]);
     }

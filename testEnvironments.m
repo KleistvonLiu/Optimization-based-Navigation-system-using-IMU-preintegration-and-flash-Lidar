@@ -316,26 +316,13 @@ end
 gravity_T = gravity_input.data;
 gravity_T = downsample(gravity_T,100);
 
-% datastep = 100;% downsampled data from 1000hz to 10hz
-% dt = 0.001*datastep;
-
-% % add bias min(mean(acc/gyr))/10
-% rng(1)
-% accbias = 1e-7 + randn(size(acc))*1e-6;%0;
-% gyrobias = 0 + randn(size(gyr))*5e-6;%0;%假设gyro像vins一样被cali了
-% 
-% acc = acc + accbias;
-% gyr = gyr + gyrobias;
-% 
-% acc = downsample(acc,datastep);
-% gyr = downsample(gyr,datastep);
 
 % flash LiDAR measurements
 fL1MeasArrayDir = fL1Meas_dir;
 fL1MeasRange = fL1MeasArrayRange.signals.values;
 fL1MeasFlagNewData = 1;% 可以把这一步分单独放到if里面，然后flprocess和processPC放到if外面
 navMode = 1;%不为96即可
-flagUseTrueRelStates = 1;%
+flagUseTrueRelStates = 0;%
 fLArrayDim = 256;
 computeICP2base = 0;
 
@@ -367,7 +354,7 @@ enddata = 5001; %length(accdata);%length(acc)
 step = 100;%every 100 imu data, we have 1 pc data
 %%
 % instance of estimator
-e2 = estimatorv2(window_size, X_init);
+% e2 = estimatorv2(window_size, X_init);
 %% 
 % %转换成simulink model的时候可以把for 里面的东西直接复制，参考刘博KF修改，主要是保存上一帧的状态last_x
 % 
@@ -430,7 +417,90 @@ e2 = estimatorv2(window_size, X_init);
 % % if (flag == 1)
 % %     Ps10 = Ps(:,1:100:end).'; % 1000hz to 10hz
 % % end
-%% estimator 增加了outputState 和outputdeltag的功能，测试下能否正常运行
+%% 相较于estimatorv2将所有q的保存格式从行变为了列
+
+% instance of estimator
+e3 = estimatorv3(window_size, X_init);
+
+
+clear fLProcessing % clear persistent variables
+
+flag = 3;%1 只有一帧，测试中值积分功能;2只有11帧，测试积分以及滑窗以及只有IMU的优化功能。3可变滑窗以及PC优化功能
+
+for i = 1:enddata
+    
+    %e.processIMU(dt,acc(i,:)',gyr(i,:)');
+    e3.processIMU(dt,accdata(i,:)',gyrodata(i,:)',gravity_T(i,:)');
+    
+    if mod(i,step) == 1
+        
+        pose_ref = zeros(6,1);
+        pose_ref(1:3) = posi_LB_L_ref(:,i);
+        pose_ref(4:6) = eulAng_LB_ref(:,i);
+        [P,~,R,~,~,~] = e3.outputState();
+        Xn_pose_cur = [P; rotm2quatliub(R.')];
+        
+        [deltaX_icp2base, deltaX_icp2last,flagRegFinished, consec2base,...
+            deltaX2base_ref, deltaX2last_ref,numValidPoints, mHRF] = fLProcessing(...
+            pose_ref, Xn_pose_cur,...
+            fL1MeasArrayDir, fL1MeasRange(:,:,i), fL1MeasFlagNewData,...
+            navMode, flagUseTrueRelStates,computeICP2base,...                               %input
+            fLArrayDim, fL1Pose_B, X_init,params4base,params4last);
+        
+        % g_sum(:,floor(i/step)+1) =e2.outputDeltaG();%需要放在processPc前，因为新的帧的g_sum是0
+        
+        %e.testProcessPC(flag,c);
+        %e.ProcessPC(pc,params);
+        e3.testProcessPC(flag,c,deltaX_icp2base, deltaX_icp2last);
+        
+         
+    end
+            
+    %index = min(window_size + 1,ceil(i/step)+1);
+    [P,Q,R,V,Ba,Bg] = e3.outputState();
+    Rs(:,:,i) = R;
+    Ps(:,i) = P;
+    Vs(:,i) = V;
+    Ba(:,i) = Ba;
+    Bg(:,i) = Bg;
+    
+    
+       
+end
+% if (flag == 1)
+%     Ps10 = Ps(:,1:100:end).'; % 1000hz to 10hz
+% end
+er1 = sum(abs(Ps(:,1:enddata)-posi_LB_L_ref(:,1:enddata)),'all');
+er2 = sum(abs(posi_LB_L_est(:,1:enddata)-posi_LB_L_ref(:,1:enddata)),'all');
+%% pure mid integration results
+e3 = estimatorv3(window_size, X_init);
+
+flag1 = 1;
+% e1 = estimator(window_size);
+for i = 1:enddata
+    
+%     if i ==5000
+%         keyboard 
+%     end
+    
+    e3.processIMU(dt,accdata(i,:)',gyrodata(i,:)',gravity_T(i,:)');
+    
+    %if mod(i,step) == 1
+    if i == 1    
+        e3.testProcessPC(flag1,c);
+%         Rs1(:,:,floor(i/step)+1) =e2.Rs(:,:,2);
+%         Ps1(:,floor(i/step)+1) =e2.Ps(:,2);
+%         Vs1(:,floor(i/step)+1) =e2.Ps(:,2);
+    end
+    Rs1(:,:,i) =e3.Rs(:,:,2);
+    Ps1(:,i) =e3.Ps(:,2);
+    Vs1(:,i) =e3.Ps(:,2);
+
+end
+% Angles1 = rotm2eul(Rs1);
+Qs1 = rotm2quatliub(Rs1);
+er3 = sum(abs(Ps1(:,1:enddata)-posi_LB_L_ref(:,1:enddata)),'all');
+%% （过去的代码）estimator 增加了outputState 和outputdeltag的功能，测试下能否正常运行
 %转换成simulink model的时候可以把for 里面的东西直接复制，参考刘博KF修改，主要是保存上一帧的状态last_x
 
 % i=1 时 初始化preintegrationbase(1) and Ps(1),then frame cout = 2,for i =
@@ -499,28 +569,3 @@ end
 % if (flag == 1)
 %     Ps10 = Ps(:,1:100:end).'; % 1000hz to 10hz
 % end
-%% pure mid integration results
-flag1 = 1;
-% e1 = estimator(window_size);
-for i = 1:1000
-    
-%     if i ==5000
-%         keyboard 
-%     end
-    
-    e2.processIMU(dt,accdata(i,:)',gyrodata(i,:)',gravity_T(i,:)');
-    
-    %if mod(i,step) == 1
-    if i == 1    
-        e2.testProcessPC(flag1,c);
-%         Rs1(:,:,floor(i/step)+1) =e2.Rs(:,:,2);
-%         Ps1(:,floor(i/step)+1) =e2.Ps(:,2);
-%         Vs1(:,floor(i/step)+1) =e2.Ps(:,2);
-    end
-    Rs1(:,:,i) =e2.Rs(:,:,2);
-    Ps1(:,i) =e2.Ps(:,2);
-    Vs1(:,i) =e2.Ps(:,2);
-
-end
-% Angles1 = rotm2eul(Rs1);
-Qs1 = rotm2quatliub(Rs1);
