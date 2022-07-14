@@ -461,8 +461,8 @@ for i = 1:enddata
     Rs(:,:,i) = R;
     Ps(:,i) = P;
     Vs(:,i) = V;
-    Ba(:,i) = Ba;
-    Bg(:,i) = Bg;
+    Bas(:,i) = Ba;
+    Bgs(:,i) = Bg;
     
     
        
