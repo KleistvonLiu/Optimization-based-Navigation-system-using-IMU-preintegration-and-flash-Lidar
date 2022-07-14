@@ -475,7 +475,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
   
   options.linear_solver_type = ceres::DENSE_SCHUR;
   //options.num_threads = 2;
-  options.trust_region_strategy_type = ceres::DOGLEG;
+  //options.trust_region_strategy_type = ceres::DOGLEG;
   options.max_num_iterations = NUM_ITERATIONS;
   //options.use_explicit_schur_complement = true;
   options.minimizer_progress_to_stdout = true;

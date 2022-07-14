@@ -478,6 +478,7 @@ er2 = max(vecnorm(posi_LB_L_est(:,1:enddata))-vecnorm(posi_LB_L_ref(:,1:enddata)
 % er1 = vecnorm(Ps(:,enddata))-vecnorm(posi_LB_L_ref(:,enddata));
 % er2 = vecnorm(posi_LB_L_est(:,enddata))-vecnorm(posi_LB_L_ref(:,enddata));
 
+%er1 = sum(abs(Ps(:,1:enddata)-posi_LB_L_ref(:,1:enddata)),'all');
 %er2 = sum(abs(posi_LB_L_est(:,1:enddata)-posi_LB_L_ref(:,1:enddata)),'all');
 %% pure mid integration results
 e3 = estimatorv3(window_size, X_init);
