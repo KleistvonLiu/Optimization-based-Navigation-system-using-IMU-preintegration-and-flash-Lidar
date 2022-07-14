@@ -322,7 +322,7 @@ fL1MeasArrayDir = fL1Meas_dir;
 fL1MeasRange = fL1MeasArrayRange.signals.values;
 fL1MeasFlagNewData = 1;% 可以把这一步分单独放到if里面，然后flprocess和processPC放到if外面
 navMode = 1;%不为96即可
-flagUseTrueRelStates = 0;%
+flagUseTrueRelStates = 1;%
 fLArrayDim = 256;
 computeICP2base = 0;
 
@@ -470,8 +470,15 @@ end
 % if (flag == 1)
 %     Ps10 = Ps(:,1:100:end).'; % 1000hz to 10hz
 % end
-er1 = sum(abs(Ps(:,1:enddata)-posi_LB_L_ref(:,1:enddata)),'all');
-er2 = sum(abs(posi_LB_L_est(:,1:enddata)-posi_LB_L_ref(:,1:enddata)),'all');
+
+% 求最大欧氏距离差
+er1 = max(vecnorm(Ps(:,1:enddata))-vecnorm(posi_LB_L_ref(:,1:enddata)));
+er2 = max(vecnorm(posi_LB_L_est(:,1:enddata))-vecnorm(posi_LB_L_ref(:,1:enddata)));
+% 求最终欧氏距离差
+% er1 = vecnorm(Ps(:,enddata))-vecnorm(posi_LB_L_ref(:,enddata));
+% er2 = vecnorm(posi_LB_L_est(:,enddata))-vecnorm(posi_LB_L_ref(:,enddata));
+
+%er2 = sum(abs(posi_LB_L_est(:,1:enddata)-posi_LB_L_ref(:,1:enddata)),'all');
 %% pure mid integration results
 e3 = estimatorv3(window_size, X_init);
 
@@ -499,7 +506,13 @@ for i = 1:enddata
 end
 % Angles1 = rotm2eul(Rs1);
 Qs1 = rotm2quatliub(Rs1);
-er3 = sum(abs(Ps1(:,1:enddata)-posi_LB_L_ref(:,1:enddata)),'all');
+
+% 求最大欧氏距离差
+er3 = max(vecnorm(Ps1(:,1:enddata))-vecnorm(posi_LB_L_ref(:,1:enddata)));
+% 求最终欧氏距离差
+% er3 = vecnorm(Ps1(:,enddata))-vecnorm(posi_LB_L_ref(:,enddata));
+
+%er3 = sum(abs(Ps1(:,1:enddata)-posi_LB_L_ref(:,1:enddata)),'all');
 %% （过去的代码）estimator 增加了outputState 和outputdeltag的功能，测试下能否正常运行
 %转换成simulink model的时候可以把for 里面的东西直接复制，参考刘博KF修改，主要是保存上一帧的状态last_x
 
