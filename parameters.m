@@ -39,10 +39,27 @@ global angRate_IL_L;
 % GYR_N=1e-10;
 % ACC_W=1e-5;
 % GYR_W=1e-5;
-ACC_N=4.2e-4 * 9.81/sqrt(3600);%
-GYR_N=0.0002 * pi/180/sqrt(3600);
-ACC_W=ACC_N*ACC_N;
-GYR_W=GYR_N*GYR_N;
+noiseSource_Ts = 0.004;
+acc_N = 4.2e-4 * 9.81/sqrt(3600); % [m/s^(3/2)]
+whiteNoiseAcc.PSD = acc_N^2;%0.00000023361; % [(m/s^2)^2/Hz] PSD of white noise
+whiteNoiseAcc.Ts = noiseSource_Ts;% [s] sample time of white noise
+param_accx_bi.B       = 4e-6 * 9.81/3600; % [m/s^2]
+
+gyro_N = 0.0002 * pi/180/sqrt(3600); % [rad/s^(1/2)]
+whiteNoiseGyro.PSD = gyro_N^2;%0.000025; % [(deg/s)^2/Hz] PSD of white noise
+whiteNoiseGyro.Ts = noiseSource_Ts;% [s] sample time of white noise
+param_gyrox_bi.B       = 5e-4/3 * pi/180/3600; % [rad/s]
+
+% ACC_N=4.2e-4 * 9.81/sqrt(3600);%
+% GYR_N=0.0002 * pi/180/sqrt(3600);
+% ACC_W=ACC_N*ACC_N;
+% GYR_W=GYR_N*GYR_N;
+
+ACC_N=sqrt(whiteNoiseAcc.PSD/whiteNoiseAcc.Ts);%
+GYR_N=sqrt(whiteNoiseGyro.PSD/whiteNoiseGyro.Ts);
+ACC_W=sqrt(0.664*param_accx_bi.B);
+GYR_W=sqrt(0.664*param_gyrox_bi.B);
+
 %g = [0;0;0];% 0 for IMUmeas data
 posi_TL_T = [2.305084000000000e+03;-2.240640000000000e+02;1.118870000000000e+02];
 quat_TL = [-0.345298814982167;-0.640216195605092;0.274162668854252;0.629068185702923];
