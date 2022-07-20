@@ -471,12 +471,16 @@ end
 %     Ps10 = Ps(:,1:100:end).'; % 1000hz to 10hz
 % end
 
-% 求最大欧氏距离差
-er1 = max(vecnorm(Ps(:,1:enddata))-vecnorm(posi_LB_L_ref(:,1:enddata)));
-er2 = max(vecnorm(posi_LB_L_est(:,1:enddata))-vecnorm(posi_LB_L_ref(:,1:enddata)));
+% 求最大的差欧氏距离
+% er1 = max(vecnorm(Ps(:,1:enddata)-posi_LB_L_ref(:,1:enddata)));
+% er2 = max(abs(vecnorm(posi_LB_L_est(:,1:enddata)-posi_LB_L_ref(:,1:enddata))));
 % 求最终欧氏距离差
-% er1 = vecnorm(Ps(:,enddata))-vecnorm(posi_LB_L_ref(:,enddata));
-% er2 = vecnorm(posi_LB_L_est(:,enddata))-vecnorm(posi_LB_L_ref(:,enddata));
+% er1 = vecnorm(Ps(:,enddata)-posi_LB_L_ref(:,enddata));
+% er2 = vecnorm(posi_LB_L_est(:,enddata)-posi_LB_L_ref(:,enddata));
+% 求欧氏距离差的平均值
+er1 = sum(vecnorm(Ps(:,1:enddata)-posi_LB_L_ref(:,1:enddata)))/enddata;
+er2 = sum(vecnorm(posi_LB_L_est(:,1:enddata)-posi_LB_L_ref(:,1:enddata)))/enddata;
+
 
 %er1 = sum(abs(Ps(:,1:enddata)-posi_LB_L_ref(:,1:enddata)),'all');
 %er2 = sum(abs(posi_LB_L_est(:,1:enddata)-posi_LB_L_ref(:,1:enddata)),'all');
@@ -509,7 +513,7 @@ end
 Qs1 = rotm2quatliub(Rs1);
 
 % 求最大欧氏距离差
-er3 = max(vecnorm(Ps1(:,1:enddata))-vecnorm(posi_LB_L_ref(:,1:enddata)));
+er3 = max(abs(vecnorm(Ps1(:,1:enddata)-posi_LB_L_ref(:,1:enddata))));
 % 求最终欧氏距离差
 % er3 = vecnorm(Ps1(:,enddata))-vecnorm(posi_LB_L_ref(:,enddata));
 
