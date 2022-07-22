@@ -28,6 +28,9 @@ global quat_TL
 global angRate_IT_T
 global R_LT;
 global angRate_IL_L;
+global ICP_N_t;
+global ICP_N_q;
+
 %global X_init
 % value from vins
 % ACC_N=0.08;%
@@ -55,10 +58,17 @@ param_gyrox_bi.B       = 5e-4/3 * pi/180/3600; % [rad/s]
 % ACC_W=ACC_N*ACC_N;
 % GYR_W=GYR_N*GYR_N;
 
-ACC_N=sqrt(whiteNoiseAcc.PSD/whiteNoiseAcc.Ts);%
-GYR_N=sqrt(whiteNoiseGyro.PSD/whiteNoiseGyro.Ts);
-ACC_W=sqrt(0.664*param_accx_bi.B);
-GYR_W=sqrt(0.664*param_gyrox_bi.B);
+factor1 = 1e-1;%1e-1;
+factor2 = 1e-1;%1e+6;
+
+ACC_N=factor1*sqrt(whiteNoiseAcc.PSD/whiteNoiseAcc.Ts);%
+GYR_N=factor1*sqrt(whiteNoiseGyro.PSD/whiteNoiseGyro.Ts);
+ACC_W=factor2*sqrt(0.664*param_accx_bi.B);
+GYR_W=factor2*sqrt(0.664*param_gyrox_bi.B);
+
+ICP_N_t = 1e-2;
+ICP_N_q = 1e-1;
+
 
 %g = [0;0;0];% 0 for IMUmeas data
 posi_TL_T = [2.305084000000000e+03;-2.240640000000000e+02;1.118870000000000e+02];

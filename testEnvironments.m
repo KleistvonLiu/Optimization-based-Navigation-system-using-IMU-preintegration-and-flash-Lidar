@@ -322,7 +322,7 @@ fL1MeasArrayDir = fL1Meas_dir;
 fL1MeasRange = fL1MeasArrayRange.signals.values;
 fL1MeasFlagNewData = 1;% 可以把这一步分单独放到if里面，然后flprocess和processPC放到if外面
 navMode = 1;%不为96即可
-flagUseTrueRelStates = 1;%
+flagUseTrueRelStates = 0;%
 fLArrayDim = 256;
 computeICP2base = 0;
 
@@ -331,7 +331,7 @@ A = eye(4);
 params4base.maxIterations = 20;
 params4base.initialTransform = A;
 params4base.metric = 'PointToPlane';
-params4base.doExtrapolate = true;%true;
+params4base.doExtrapolate = false;%true;
 params4base.inlierRatio = 0.7;%0.3;%0.95
 params4base.thresHold = 0.16;
 params4base.tolerance = [0.00001, 0.00009];%[0.001, 0.009];%[0.00001, 0.00009];%
@@ -342,7 +342,7 @@ params4base.arrayDim = 85;%sqrt(size(fixedPc,1));
 params4last.maxIterations = 20;
 params4last.initialTransform = A;
 params4last.metric = 'PointToPlane';
-params4last.doExtrapolate = true;%true;
+params4last.doExtrapolate = false;%true;
 params4last.inlierRatio = 0.7;%0.3;%0.95
 params4last.thresHold = 0.16;
 params4last.tolerance = [0.00001, 0.00009];%[0.001, 0.009];%[0.00001, 0.00009];%
@@ -433,7 +433,9 @@ for i = 1:enddata
     e3.processIMU(dt,accdata(i,:)',gyrodata(i,:)',gravity_T(i,:)');
     
     if mod(i,step) == 1
-        
+%         if i == 1101
+%            keyboard 
+%         end
         pose_ref = zeros(6,1);
         pose_ref(1:3) = posi_LB_L_ref(:,i);
         pose_ref(4:6) = eulAng_LB_ref(:,i);
@@ -472,8 +474,8 @@ end
 % end
 
 % 求最大的差欧氏距离
-% er1 = max(vecnorm(Ps(:,1:enddata)-posi_LB_L_ref(:,1:enddata)));
-% er2 = max(abs(vecnorm(posi_LB_L_est(:,1:enddata)-posi_LB_L_ref(:,1:enddata))));
+er1 = max(vecnorm(Ps(:,1:enddata)-posi_LB_L_ref(:,1:enddata)));
+er2 = max(abs(vecnorm(posi_LB_L_est(:,1:enddata)-posi_LB_L_ref(:,1:enddata))));
 % 求最终欧氏距离差
 % er1 = vecnorm(Ps(:,enddata)-posi_LB_L_ref(:,enddata));
 % er2 = vecnorm(posi_LB_L_est(:,enddata)-posi_LB_L_ref(:,enddata));

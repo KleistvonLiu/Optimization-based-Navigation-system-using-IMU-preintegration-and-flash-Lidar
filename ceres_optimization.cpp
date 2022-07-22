@@ -236,10 +236,11 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
   double dpContainer[10][3],dqContainer[10][4],dvContainer[10][3];
   double JContainer[10][15][15],PContainer[10][15][15],baContainer[10][3],bgContainer[10][3],dtContainer[10];
   double icp2last[WINDOW_SIZE][7], icp2base[7],g_sum[WINDOW_SIZE+1][3];
+  double ICP_N_t ,ICP_N_q;
 
   double* inMatrix0,*inMatrix1,*inMatrix2,*inMatrix3,*inMatrix4,*inMatrix5,*inMatrix6;
   double* inMatrix7,*inMatrix8,*inMatrix9,*inMatrix10,*inMatrix11,*inMatrix12,*inMatrix13;
-  double* inMatrix14,*inMatrix15, *inMatrix17;
+  double* inMatrix14,*inMatrix15, *inMatrix17, *inMatrix18, *inMatrix19;
   
   inMatrix0 = mxGetPr(prhs[0]);
   inMatrix1 = mxGetPr(prhs[1]);
@@ -258,7 +259,9 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
   inMatrix14 = mxGetPr(prhs[14]);
   inMatrix15 = mxGetPr(prhs[15]);
   inMatrix17 = mxGetPr(prhs[17]);
-
+  inMatrix18 = mxGetPr(prhs[18]);
+  inMatrix19 = mxGetPr(prhs[19]);
+          
   memcpy(Ps, inMatrix0, sizeof(Ps));
   memcpy(Rs, inMatrix1, sizeof(Rs));
   memcpy(Qs, inMatrix2, sizeof(Qs));
@@ -276,6 +279,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
   memcpy(icp2last, inMatrix14, sizeof(icp2last));
   memcpy(icp2base, inMatrix15, sizeof(icp2base));
   memcpy(g_sum, inMatrix17, sizeof(g_sum));
+  ICP_N_t = *inMatrix18;
+  ICP_N_q = *inMatrix19;
   
   for (int i = 0; i <= WINDOW_SIZE; i++)
     {
@@ -445,18 +450,18 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
   
 # if 1  
   // add residualblocks
-  for (int i = 0; i < frame_count-1; i++)
-    {
-        int j = i + 1;
-//         if (pre_integrations[j]->sum_dt > 10.0)
-//             continue;
-        // vins里面imufactor一共十一个取后十个，我们这里matlab直接给了后十个
-//         cout<<dp[i]<<endl<<dq[i].w()<<endl<<dq[i].vec()<<endl<<dv[i]<<endl<<ba[i]<<endl<<bg[i]<<endl;
-//         cout<<jacobian[i]<<endl<<covariance[i]<<endl<<dtContainer[i]<<endl<<deltaG_sum[j]<<endl;
-//         cout<<para_Pose[i]<<endl<<para_SpeedBias[i]<<endl<<para_Pose[j]<<endl<<para_SpeedBias[j]<<endl;
-        IMUFactor* imu_factor = new IMUFactor(dp[i],dq[i],dv[i],ba[i],bg[i],jacobian[i],covariance[i],dtContainer[i],deltaG_sum[j]);
-        problem.AddResidualBlock(imu_factor, NULL, para_Pose[i], para_SpeedBias[i], para_Pose[j], para_SpeedBias[j]);
-    }
+//   for (int i = 0; i < frame_count-1; i++)
+//     {
+//         int j = i + 1;
+// //         if (pre_integrations[j]->sum_dt > 10.0)
+// //             continue;
+//         // vins里面imufactor一共十一个取后十个，我们这里matlab直接给了后十个
+// //         cout<<dp[i]<<endl<<dq[i].w()<<endl<<dq[i].vec()<<endl<<dv[i]<<endl<<ba[i]<<endl<<bg[i]<<endl;
+// //         cout<<jacobian[i]<<endl<<covariance[i]<<endl<<dtContainer[i]<<endl<<deltaG_sum[j]<<endl;
+// //         cout<<para_Pose[i]<<endl<<para_SpeedBias[i]<<endl<<para_Pose[j]<<endl<<para_SpeedBias[j]<<endl;
+//         IMUFactor* imu_factor = new IMUFactor(dp[i],dq[i],dv[i],ba[i],bg[i],jacobian[i],covariance[i],dtContainer[i],deltaG_sum[j]);
+//         problem.AddResidualBlock(imu_factor, NULL, para_Pose[i], para_SpeedBias[i], para_Pose[j], para_SpeedBias[j]);
+//     }
         
   for (int i = 0; i < frame_count-1; i++)
     {
@@ -464,10 +469,10 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 //         if (pre_integrations[j]->sum_dt > 10.0)
 //             continue;
         // vins里面imufactor一共十一个取后十个，我们这里matlab直接给了后十个
-        ceres::CostFunction *cost_function = PCfactor::Create(dpICP2last[i], dqICP2last[i]);
+        ceres::CostFunction *cost_function = PCfactor::Create(dpICP2last[i], dqICP2last[i],ICP_N_t,ICP_N_q);
         problem.AddResidualBlock(cost_function, NULL, para_Pose[i], para_Pose[j]);
     }
-//   ceres::CostFunction *cost_function_base = PCfactor::Create(dpICP2base, dqICP2base);
+//   ceres::CostFunction *cost_function_base = PCfactor::Create(dpICP2base, dqICP2base,ICP_N_t,ICP_N_q);
 //   problem.AddResidualBlock(cost_function_base, NULL, para_Pose[0], para_Pose[frame_count-1]);
   
         

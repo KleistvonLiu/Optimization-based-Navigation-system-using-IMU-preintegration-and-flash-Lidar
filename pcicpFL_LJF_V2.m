@@ -391,6 +391,8 @@ for i = 1 : params.maxIterations
 
     % RMSE
     movingPc_list_new = rigidTransform(movingPc_list_sampled, Rs(:,:,i+1), Ts(:,i+1));
+    movingPc_normals_list_new = rigidTransform(movingPc_normals_list_sampled, Rs(:,:,i+1), [0;0;0]);
+
     squaredError = sum((movingPc_list_new(inlierIndicesM, :) - fixedPc_list_sampled(inlierIndicesF, :)).^2, 2);
     Err(i+1) = sqrt(sum(squaredError)/length(squaredError));
     
@@ -634,8 +636,8 @@ function [R, T] = pointToPlaneMetric(p, q, nv)
           sum(sum(qp.*repmat(cn(:,5),1,3).*nv, 2));
           sum(sum(qp.*repmat(cn(:,6),1,3).*nv, 2))];
     % X is [alpha, beta, gamma, Tx, Ty, Tz]
-    X = C\b;
-
+    % X = C\b;
+    X = pinv(C)*b;    
     cx = cos(X(1)); 
     cy = cos(X(2)); 
     cz = cos(X(3)); 

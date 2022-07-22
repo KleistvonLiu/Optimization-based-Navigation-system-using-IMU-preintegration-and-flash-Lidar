@@ -288,6 +288,8 @@ classdef estimatorv3 < handle
                     obj.Rs(:,:,obj.frame_count) = obj.Rs(:,:,obj.frame_count-1);
                     obj.Ps(:,obj.frame_count) =obj.Ps(:,obj.frame_count-1);
                     obj.Vs(:,obj.frame_count) =obj.Vs(:,obj.frame_count-1);
+                    obj.Bas(:,obj.frame_count) =obj.Bas(:,obj.frame_count-1);
+                    obj.Bgs(:,obj.frame_count) =obj.Bgs(:,obj.frame_count-1);
                     obj.new_frame = 1;
                 end
             end            
@@ -318,10 +320,17 @@ classdef estimatorv3 < handle
                 %obj.dqContainerArray = compact(obj.dqContainer);%convert quaternion class into array
                 obj.dqContainerArray = [obj.dqContainerArray(4,:);obj.dqContainerArray(1:3,:)];
                 
-            [para_pose,para_speedbias] = ceres_optimization(obj.Ps,obj.Rs,obj.Qs,obj.Vs,obj.Bas,obj.Bgs,...
+                global ICP_N_t;
+                global ICP_N_q;
+                ICP_N_t_ = ICP_N_t;
+                ICP_N_q_ = ICP_N_q;
+%             [para_pose,para_speedbias] = ceres_optimization(obj.Ps,obj.Rs,obj.Qs,obj.Vs,obj.Bas,obj.Bgs,...
+%                 obj.dpContainer,obj.dqContainerArray,obj.dvContainer,obj.JContainer,obj.PContainer,...
+%                 obj.baContainer,obj.bgContainer,obj.dtContainer,obj.deltaT2last,obj.deltaT2base,obj.frame_count,obj.g_sum,ICP_N_t_,ICP_N_q_);
+            
+            [para_pose,para_speedbias] = ceres_optimization_onlyPC(obj.Ps,obj.Rs,obj.Qs,obj.Vs,obj.Bas,obj.Bgs,...
                 obj.dpContainer,obj.dqContainerArray,obj.dvContainer,obj.JContainer,obj.PContainer,...
-                obj.baContainer,obj.bgContainer,obj.dtContainer,obj.deltaT2last,obj.deltaT2base,obj.frame_count,obj.g_sum);
-
+                obj.baContainer,obj.bgContainer,obj.dtContainer,obj.deltaT2last,obj.deltaT2base,obj.frame_count,obj.g_sum,ICP_N_t_,ICP_N_q_);
             
 %             ceres_optimization(obj.Ps,obj.Rs,obj.Qs,obj.Vs,obj.Bas,obj.Bgs,...
 %                 obj.dpContainer,obj.dqContainerArray,obj.dvContainer,obj.JContainer,obj.PContainer,...
@@ -342,8 +351,9 @@ classdef estimatorv3 < handle
                 disp(["euler singular point!"]);
                 rot_diff = obj.Rs(:,:,1) * quat2rotmliub([para_pose(1,4),para_pose(1,5),para_pose(1,6),para_pose(1,7)]).'.';
             end
-            %rot_diff = [1 0 0;0 1 0;0 0 1];
-
+            % 不对第一帧的位姿进行处理
+            % rot_diff = [1 0 0;0 1 0;0 0 1];
+            
             for i = 1:obj.frame_count
            
                 obj.Rs(:,:,i) = rot_diff * quat2rotmliub([para_pose(i,4),para_pose(i,5),para_pose(i,6),para_pose(i,7)]/norm([para_pose(i,4),para_pose(i,5),para_pose(i,6),para_pose(i,7)])).';
