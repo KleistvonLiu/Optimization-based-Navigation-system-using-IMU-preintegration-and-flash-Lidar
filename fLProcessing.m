@@ -205,7 +205,7 @@ else
             if(flagUseTrueRelStates >0.5)
                 deltaX_icp2base = deltaX2base_ref;
             else
-                [T2base, ~] = pcicpFL_LJF_V2(curPc_B_sampled, basePc, params4base);
+                [T2base, ~] = pcicpFL_LJF_V2_mex(curPc_B_sampled, basePc, params4base);
                 deltaX_icp2base(1:3,1) = T2base(1:3,4);
                 deltaX_icp2base(4:7,1) = rotm2quatliub(T2base(1:3,1:3).');
             end
@@ -271,7 +271,7 @@ else
         if(flagUseTrueRelStates >0.5)
             deltaX_icp2last = deltaX2last_ref;
         else
-            [T2last, ~] = pcicpFL_LJF_V2(curPc_B_sampled, lastPc, params4last);
+            [T2last, ~] = pcicpFL_LJF_V2_mex(curPc_B_sampled, lastPc, params4last);
             deltaX_icp2last(1:3,1) = T2last(1:3,4);
             deltaX_icp2last(4:7,1) = rotm2quatliub(T2last(1:3,1:3).');
         end        
