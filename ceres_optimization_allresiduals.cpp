@@ -17,7 +17,7 @@ using namespace std;
 
 // 代价函数的计算模型
 
-const int WINDOW_SIZE = 20;
+const int WINDOW_SIZE = 5;
 const int SIZE_POSE = 7;
 const int SIZE_SPEEDBIAS = 9;
         
@@ -236,11 +236,11 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
   double dpContainer[WINDOW_SIZE][3],dqContainer[WINDOW_SIZE][4],dvContainer[WINDOW_SIZE][3];
   double JContainer[WINDOW_SIZE][15][15],PContainer[WINDOW_SIZE][15][15],baContainer[WINDOW_SIZE][3],bgContainer[WINDOW_SIZE][3],dtContainer[WINDOW_SIZE];
   double icp2last[WINDOW_SIZE][7], icp2base[7],g_sum[WINDOW_SIZE+1][3];
-  double ICP_N_t ,ICP_N_q;
+  double ICP_N_t ,ICP_N_q,base_state[7];
 
   double* inMatrix0,*inMatrix1,*inMatrix2,*inMatrix3,*inMatrix4,*inMatrix5,*inMatrix6;
   double* inMatrix7,*inMatrix8,*inMatrix9,*inMatrix10,*inMatrix11,*inMatrix12,*inMatrix13;
-  double* inMatrix14,*inMatrix15, *inMatrix17, *inMatrix18, *inMatrix19;
+  double* inMatrix14,*inMatrix15, *inMatrix17, *inMatrix18, *inMatrix19,*inMatrix20;
   
   inMatrix0 = mxGetPr(prhs[0]);
   inMatrix1 = mxGetPr(prhs[1]);
@@ -261,7 +261,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
   inMatrix17 = mxGetPr(prhs[17]);
   inMatrix18 = mxGetPr(prhs[18]);
   inMatrix19 = mxGetPr(prhs[19]);
-          
+  inMatrix20 = mxGetPr(prhs[20]);
+
   memcpy(Ps, inMatrix0, sizeof(Ps));
   memcpy(Rs, inMatrix1, sizeof(Rs));
   memcpy(Qs, inMatrix2, sizeof(Qs));
@@ -281,6 +282,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
   memcpy(g_sum, inMatrix17, sizeof(g_sum));
   ICP_N_t = *inMatrix18;
   ICP_N_q = *inMatrix19;
+  memcpy(base_state, inMatrix20, sizeof(base_state));
   
   for (int i = 0; i <= WINDOW_SIZE; i++)
     {
@@ -432,8 +434,12 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 //   }
 //   cout<<dpICP2base<<" "<<endl;
 //   cout<<dqICP2base.w()<<endl<<dqICP2base.vec()<<endl<<" "<<endl;
+//   Eigen::Vector3d pbase;
+//   Eigen::Quaterniond qbase;
+//   pbase<<base_state[0],base_state[1],base_state[2];
+//   qbase = Eigen::Quaterniond(icp2base[6],icp2base[3],icp2base[4],icp2base[5]);
   
-    
+  
   Eigen::Vector3d deltaG_sum[WINDOW_SIZE+1];
 
   for (int i = 0; i <= WINDOW_SIZE; i++)
@@ -473,8 +479,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
         problem.AddResidualBlock(cost_function, NULL, para_Pose[i], para_Pose[j]);
     }
   ceres::CostFunction *cost_function_base = PCfactor::Create(dpICP2base, dqICP2base,ICP_N_t,ICP_N_q);
-  problem.AddResidualBlock(cost_function_base, NULL, para_Pose[0], para_Pose[frame_count-1]);
-  
+  //problem.AddResidualBlock(cost_function_base, NULL, para_Pose[0], para_Pose[frame_count-1]);
+  problem.AddResidualBlock(cost_function_base, NULL, base_state, para_Pose[frame_count-1]);
         
   ceres::Solver::Options options;
   
@@ -506,10 +512,10 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 //   cout << summary.BriefReport() << endl;
   cout << summary.FullReport() << endl;
   
-  plhs[0] = mxCreateDoubleMatrix(WINDOW_SIZE+1,SIZE_POSE, mxREAL);
+  plhs[0] = mxCreateDoubleMatrix(WINDOW_SIZE+1,SIZE_POSE, mxREAL);//WINDOW_SIZE+1
   double *_ptr0 = (double*)mxGetPr(plhs[0]); // 获取矩阵数据指针
   memcpy(_ptr0, para_Pose, sizeof(para_Pose));
-  plhs[1] = mxCreateDoubleMatrix(WINDOW_SIZE+1,SIZE_SPEEDBIAS, mxREAL);
+  plhs[1] = mxCreateDoubleMatrix(WINDOW_SIZE+1,SIZE_SPEEDBIAS, mxREAL);//WINDOW_SIZE+1
   double *_ptr1 = (double*)mxGetPr(plhs[1]); // 获取矩阵数据指针
   memcpy(_ptr1, para_SpeedBias, sizeof(para_SpeedBias));
 # endif

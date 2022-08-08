@@ -320,9 +320,9 @@ classdef estimatorv4 < handle
 %                 obj.dpContainer,obj.dqContainerArray,obj.dvContainer,obj.JContainer,obj.PContainer,...
 %                 obj.baContainer,obj.bgContainer,obj.dtContainer,obj.deltaT2last,obj.deltaT2base,obj.frame_count,obj.g_sum,ICP_N_t_,ICP_N_q_);
  
-            [para_pose,para_speedbias] = ceres_optimization_allresidualssamenoise(obj.Ps,obj.Rs,obj.Qs,obj.Vs,obj.Bas,obj.Bgs,...
+            [para_pose,para_speedbias] = ceres_optimization_allresiduals_sameN_fixedfirstframe(obj.Ps,obj.Rs,obj.Qs,obj.Vs,obj.Bas,obj.Bgs,...
                 obj.dpContainer,obj.dqContainerArray,obj.dvContainer,obj.JContainer,obj.PContainer,...
-                obj.baContainer,obj.bgContainer,obj.dtContainer,obj.deltaT2last,obj.deltaT2base,obj.frame_count,obj.g_sum,ICP_N_t_,ICP_N_q_);
+                obj.baContainer,obj.bgContainer,obj.dtContainer,obj.deltaT2last,obj.deltaT2base,obj.frame_count,obj.g_sum,ICP_N_t_,ICP_N_q_, obj.base_state);
 
 %             [para_pose,para_speedbias] = ceres_optimization_onlyPC(obj.Ps,obj.Rs,obj.Qs,obj.Vs,obj.Bas,obj.Bgs,...
 %                 obj.dpContainer,obj.dqContainerArray,obj.dvContainer,obj.JContainer,obj.PContainer,...
@@ -333,8 +333,8 @@ classdef estimatorv4 < handle
 %                 obj.baContainer,obj.bgContainer,obj.dtContainer,obj.deltaT2last,obj.deltaT2base,obj.frame_count,obj.g_sum);
             
             % return
-            para_pose = reshape(para_pose,[7,obj.window_size+1]).';
-            para_speedbias = reshape(para_speedbias,[9,obj.window_size+1]).';
+            para_pose = reshape(para_pose,[7,obj.window_size+1]).';%obj.frame_count
+            para_speedbias = reshape(para_speedbias,[9,obj.window_size+1]).';%obj.frame_count
 
             
             % 计算初始位置的R的偏移，先用ypr 如果不行，直接算R的差

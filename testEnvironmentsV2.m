@@ -19,7 +19,7 @@ R_LB = [];
 % ！！！！应该是要改成成员变量的，那就不用这么麻烦了
 %g=0;
 
-window_size = 20;
+window_size = 5;
 c = 50;% frame size = 50 imu data points
 
 %load data 
@@ -182,7 +182,6 @@ er2 = max(vecnorm(posi_LB_L_est(:,1:enddata)-posi_LB_L_ref(:,1:enddata)));
 % 求欧氏距离差的平均值
 er3 = sum(vecnorm(P_LB_L(:,1:enddata)-posi_LB_L_ref(:,1:enddata)))/enddata;
 er4 = sum(vecnorm(posi_LB_L_est(:,1:enddata)-posi_LB_L_ref(:,1:enddata)))/enddata;
-ern1 = sum(vecnorm(Ps(:,1:enddata)-posi_NB_N_ref(:,1:enddata)))/enddata;
 
 tSim = linspace(0,floor(enddata/10),enddata); 
 
@@ -218,6 +217,7 @@ for i = 1:length(index)
     end
     R_LN = R_N1N2*R_LN;
 end
+ern1 = sum(vecnorm(Ps(:,1:enddata)-posi_NB_N_ref(:,1:enddata)))/enddata;
 
 h(98) = figure('Name','Position in N');
 subplot(3,2,1)
