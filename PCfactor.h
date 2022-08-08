@@ -36,6 +36,7 @@ struct PCfactor
                      T(0),T(0),T(0),T(0),T(noise_q),T(0),
                      T(0),T(0),T(0),T(0),T(0),T(noise_q);
         //cout<<noise_t<<endl<<noise_q;
+        //sqrt_info.setIdentity();
         residuals = sqrt_info.inverse()*residuals;        
 		return true;
 	}

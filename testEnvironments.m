@@ -277,6 +277,7 @@ Vs = [];
 Bas= [];
 Bgs= [];
 g_sum= [];
+angles = [];
 
 % ！！！！应该是要改成成员变量的，那就不用这么麻烦了
 %g=0;
@@ -352,6 +353,19 @@ params4last.arrayDim = 85;%sqrt(size(fixedPc,1));
 
 enddata = 5001; %length(accdata);%length(acc)
 step = 100;%every 100 imu data, we have 1 pc data
+
+for i = 1:size(quat_LB_est,2)
+    
+    eulAng_LB_est(:,i) = rad2deg(quat2eulAngliub(quat_LB_est(:,i)));
+    
+end
+for i = 1:size(eulAng_LB_ref,2)
+    
+    eulAng_LB_ref(:,i) = rad2deg(eulAng_LB_ref(:,i));
+    
+end
+acc_LB_L_ref = downsample(acc_LB_L_ref,100);
+acc_LB_L_ref = acc_LB_L_ref.';
 %%
 % instance of estimator
 % e2 = estimatorv2(window_size, X_init);
@@ -419,7 +433,8 @@ step = 100;%every 100 imu data, we have 1 pc data
 % % end
 %% 相较于estimatorv2将所有q的保存格式从行变为了列
 
-% instance of estimator
+% instance of estimator(v3:no relative navi; v3:relative navi)
+%e3 = estimatorv3(window_size, X_init);
 e3 = estimatorv3(window_size, X_init);
 
 
@@ -433,7 +448,7 @@ for i = 1:enddata
     e3.processIMU(dt,accdata(i,:)',gyrodata(i,:)',gravity_T(i,:)');
     
     if mod(i,step) == 1
-%         if i == 1101
+%         if i == 1601
 %            keyboard 
 %         end
         pose_ref = zeros(6,1);
@@ -443,7 +458,7 @@ for i = 1:enddata
         Xn_pose_cur = [P; rotm2quatliub(R.')];
         
         [deltaX_icp2base, deltaX_icp2last,flagRegFinished, consec2base,...
-            deltaX2base_ref, deltaX2last_ref,numValidPoints, mHRF] = fLProcessing(...
+            deltaX2base_ref, deltaX2last_ref,flagNewNode,numValidPoints, mHRF] = fLProcessing(...
             pose_ref, Xn_pose_cur,...
             fL1MeasArrayDir, fL1MeasRange(:,:,i), fL1MeasFlagNewData,...
             navMode, flagUseTrueRelStates,computeICP2base,...                               %input
@@ -453,8 +468,18 @@ for i = 1:enddata
         
         %e.testProcessPC(flag,c);
         %e.ProcessPC(pc,params);
-        e3.testProcessPC(flag,c,deltaX_icp2base, deltaX_icp2last);
+        e3.testProcessPC(flag,c,deltaX_icp2base, deltaX_icp2last,flagNewNode);
         
+        if(flagNewNode==1)
+            [P,~,R,~,~,~] = e3.outputState();
+            Xn_pose_cur = [P; rotm2quatliub(R.')];
+            X_init = e3.outputXNewInit();
+            [~] = fLProcessing(...
+                pose_ref, Xn_pose_cur,...
+                fL1MeasArrayDir, fL1MeasRange(:,:,i), fL1MeasFlagNewData,...
+                navMode, flagUseTrueRelStates,computeICP2base,...                               %input
+                fLArrayDim, fL1Pose_B, X_init,params4base,params4last);
+        end
          
     end
             
@@ -465,27 +490,177 @@ for i = 1:enddata
     Vs(:,i) = V;
     Bas(:,i) = Ba;
     Bgs(:,i) = Bg;
-    
-    
+    angles(:,i) = rad2deg(rotm2eulAngliub(permute(R,[2,1,3])));    
        
 end
-% if (flag == 1)
-%     Ps10 = Ps(:,1:100:end).'; % 1000hz to 10hz
-% end
+
 
 % 求最大的差欧氏距离
 er1 = max(vecnorm(Ps(:,1:enddata)-posi_LB_L_ref(:,1:enddata)));
-er2 = max(abs(vecnorm(posi_LB_L_est(:,1:enddata)-posi_LB_L_ref(:,1:enddata))));
+er2 = max(vecnorm(posi_LB_L_est(:,1:enddata)-posi_LB_L_ref(:,1:enddata)));
 % 求最终欧氏距离差
-% er1 = vecnorm(Ps(:,enddata)-posi_LB_L_ref(:,enddata));
-% er2 = vecnorm(posi_LB_L_est(:,enddata)-posi_LB_L_ref(:,enddata));
+% er5 = vecnorm(Ps(:,enddata)-posi_LB_L_ref(:,enddata));
+% er6 = vecnorm(posi_LB_L_est(:,enddata)-posi_LB_L_ref(:,enddata));
 % 求欧氏距离差的平均值
-er1 = sum(vecnorm(Ps(:,1:enddata)-posi_LB_L_ref(:,1:enddata)))/enddata;
-er2 = sum(vecnorm(posi_LB_L_est(:,1:enddata)-posi_LB_L_ref(:,1:enddata)))/enddata;
+er3 = sum(vecnorm(Ps(:,1:enddata)-posi_LB_L_ref(:,1:enddata)))/enddata;
+er4 = sum(vecnorm(posi_LB_L_est(:,1:enddata)-posi_LB_L_ref(:,1:enddata)))/enddata;
 
+%% visulization
+h(1) = figure('Name','Position');
+subplot(3,2,1)
+tSim = linspace(0,500,enddata); 
+plot(tSim, posi_LB_L_est(1,:),'b'); hold on;grid on;
+plot(tSim, Ps(1,:),'black'); hold on;grid on;
+plot(tSim, posi_LB_L_ref(1,1:enddata),':r'); hold on;grid on;
+title('Position Estimation');
+ylabel('x [m]','FontSize',50);set(gca,'FontSize',15);
+legend('fLaINSest','optEst','Ref. in L frame')
+subplot(3,2,3)
+plot(tSim, posi_LB_L_est(2,:),'b'); hold on;grid on;
+plot(tSim, Ps(2,:),'black'); hold on;grid on;
+plot(tSim, posi_LB_L_ref(2,1:enddata),':r'); hold on;grid on;
+legend('fLaINSest','optEst','Ref. in L frame')
+ylabel('y [m]','FontSize',50);set(gca,'FontSize',15);
+subplot(3,2,5)
+plot(tSim, posi_LB_L_est(3,:),'b'); hold on;grid on;
+plot(tSim, Ps(3,:),'black'); hold on;grid on;
+plot(tSim, posi_LB_L_ref(3,1:enddata),':r'); hold on;grid on;
+legend('fLaINSest','optEst','Ref. in L frame')
+ylabel('z [m]','FontSize',50);set(gca,'FontSize',15);
+xlabel('time [s]','FontSize',20);
 
-%er1 = sum(abs(Ps(:,1:enddata)-posi_LB_L_ref(:,1:enddata)),'all');
-%er2 = sum(abs(posi_LB_L_est(:,1:enddata)-posi_LB_L_ref(:,1:enddata)),'all');
+subplot(3,2,2)
+plot(tSim, Ps(1,:)-posi_LB_L_ref(1,1:enddata)); hold on;grid on;
+title('Position errors');
+ylabel('x (est-ref) [m]','FontSize',50);set(gca,'FontSize',15);
+subplot(3,2,4)
+plot(tSim, Ps(2,:)-posi_LB_L_ref(2,1:enddata)); hold on;grid on;
+ylabel('y (est-ref) [m]','FontSize',50);set(gca,'FontSize',15);
+subplot(3,2,6)
+plot(tSim, Ps(3,:)-posi_LB_L_ref(3,1:enddata)); hold on;grid on;
+ylabel('z (est-ref) [m]','FontSize',50);set(gca,'FontSize',15);
+xlabel('time [s]','FontSize',20);
+
+h(2) = figure('Name','Norm of position difference(est-ref)');
+% subplot(3,2,1)
+% tSim = linspace(0,500,enddata); 
+plot(tSim, vecnorm(posi_LB_L_est(:,1:enddata)-posi_LB_L_ref(:,1:enddata)),'r'); hold on;grid on;
+plot(tSim, vecnorm(Ps(:,1:enddata)-posi_LB_L_ref(:,1:enddata)),'b'); hold on;grid on;
+title('Norm of position difference(est-ref)');
+ylabel('x [m]','FontSize',50);set(gca,'FontSize',15);
+legend('fLaINSest','optEst')
+
+h(3) = figure('Name','Velocity');
+subplot(3,2,1)
+tSim = linspace(0,500,enddata); 
+plot(tSim, vel_LB_L_est(1,:),'b'); hold on;grid on;
+plot(tSim, Vs(1,:),'black'); hold on;grid on;
+plot(tSim, vel_LB_L_ref(1,1:enddata),':r'); hold on;grid on;
+title('Velocity Estimation');
+ylabel('x [m/s]','FontSize',50);set(gca,'FontSize',15);
+legend('fLaINSest','optEst','Ref. in L frame')
+subplot(3,2,3)
+plot(tSim, vel_LB_L_est(2,:),'b'); hold on;grid on;
+plot(tSim, Vs(2,:),'black'); hold on;grid on;
+plot(tSim, vel_LB_L_ref(2,1:enddata),':r'); hold on;grid on;
+legend('fLaINSest','optEst','Ref. in L frame')
+ylabel('y [m/s]','FontSize',50);set(gca,'FontSize',15);
+subplot(3,2,5)
+plot(tSim, vel_LB_L_est(3,:),'b'); hold on;grid on;
+plot(tSim, Vs(3,:),'black'); hold on;grid on;
+plot(tSim, vel_LB_L_ref(3,1:enddata),':r'); hold on;grid on;
+legend('fLaINSest','optEst','Ref. in L frame')
+ylabel('z [m/s]','FontSize',50);set(gca,'FontSize',15);
+xlabel('time [s]','FontSize',20);
+
+subplot(3,2,2)
+plot(tSim, Vs(1,:)-vel_LB_L_ref(1,1:enddata)); hold on;grid on;
+title('Velocity errors');
+ylabel('x (est-ref) [m/s]','FontSize',50);set(gca,'FontSize',15);
+subplot(3,2,4)
+plot(tSim, Vs(2,:)-vel_LB_L_ref(2,1:enddata)); hold on;grid on;
+ylabel('y (est-ref) [m/s]','FontSize',50);set(gca,'FontSize',15);
+subplot(3,2,6)
+plot(tSim, Vs(3,:)-vel_LB_L_ref(3,1:enddata)); hold on;grid on;
+ylabel('z (est-ref) [m/s]','FontSize',50);set(gca,'FontSize',15);
+xlabel('time [s]','FontSize',20);
+
+h(4) = figure('Name','Euler angles');
+subplot(3,2,1)
+tSim = linspace(0,500,enddata); 
+plot(tSim, eulAng_LB_est(1,:),'b'); hold on;grid on;
+plot(tSim, angles(1,:),'black'); hold on;grid on;
+plot(tSim, eulAng_LB_ref(1,1:enddata),':r'); hold on;grid on;
+title('Euler angles Estimation');
+ylabel('roll [degree]','FontSize',50);set(gca,'FontSize',15);
+legend('fLaINSest','optEst','Ref. in L frame')
+subplot(3,2,3)
+plot(tSim, eulAng_LB_est(2,:),'b'); hold on;grid on;
+plot(tSim, angles(2,:),'black'); hold on;grid on;
+plot(tSim, eulAng_LB_ref(2,1:enddata),':r'); hold on;grid on;
+legend('fLaINSest','optEst','Ref. in L frame')
+ylabel('pitch [degree]','FontSize',50);set(gca,'FontSize',15);
+subplot(3,2,5)
+plot(tSim, eulAng_LB_est(3,:),'b'); hold on;grid on;
+plot(tSim, angles(3,:),'black'); hold on;grid on;
+plot(tSim, eulAng_LB_ref(3,1:enddata),':r'); hold on;grid on;
+legend('fLaINSest','optEst','Ref. in L frame')
+ylabel('yaw [degree]','FontSize',50);set(gca,'FontSize',15);
+xlabel('time [s]','FontSize',20);
+
+subplot(3,2,2)
+plot(tSim, angles(1,:)-eulAng_LB_ref(1,1:enddata)); hold on;grid on;
+title('Euler angles errors');
+ylabel('x (est-ref) [degree]','FontSize',50);set(gca,'FontSize',15);
+subplot(3,2,4)
+plot(tSim, angles(2,:)-eulAng_LB_ref(2,1:enddata)); hold on;grid on;
+ylabel('y (est-ref) [degree]','FontSize',50);set(gca,'FontSize',15);
+subplot(3,2,6)
+plot(tSim, angles(3,:)-eulAng_LB_ref(3,1:enddata)); hold on;grid on;
+ylabel('z (est-ref) [degree]','FontSize',50);set(gca,'FontSize',15);
+xlabel('time [s]','FontSize',20);
+
+h(5) = figure('Name','Ref. acceleration in L frame');
+subplot(3,1,1)
+plot(tSim, acc_LB_L_ref(1,1:enddata),'b'); hold on;grid on;
+% plot(tSim, refRN_Vel_BL(1,1:numStepSim),':r'); hold on;grid on;
+title('Acc. in L-frame');
+ylabel('x [m/s^2]');
+% legend('Navigation','Reference')
+subplot(3,1,2)
+plot(tSim, acc_LB_L_ref(2,1:enddata),'b'); hold on;grid on;
+% plot(tSim, refRN_Vel_BL(2,1:numStepSim),':r'); hold on;grid on;
+ylabel('y [m/s^2]');
+% legend('Navigation','Reference')
+subplot(3,1,3)
+plot(tSim, acc_LB_L_ref(3,1:enddata),'b'); hold on;grid on;
+% plot(tSim, refRN_Vel_BL(3,1:numStepSim),':r'); hold on;grid on;
+ylabel('z [m/s^2]');
+% legend('Navigation','Reference')
+xlabel('time [s]');
+
+h(6) = figure('Name','Angular rates LB in B');
+subplot(3,1,1)
+% plot(tSim, rad2deg(angRate_LB_B_est(1,:)),'b'); hold on;grid on;
+plot(tSim, rad2deg(angRate_LB_B_ref(1,1:enddata)),'b'); hold on;grid on;
+title('INS angular rates LB in B');
+ylabel('phi [deg/s]');
+% legend('fLaINSest','Ref.')
+legend('Ref.')
+subplot(3,1,2)
+% plot(tSim, rad2deg(angRate_LB_B_est(2,:)),'b'); hold on;grid on;
+plot(tSim, rad2deg(angRate_LB_B_ref(2,1:enddata)),'b'); hold on;grid on;
+ylabel('theta [deg/s]');
+% legend('fLaINSest','Ref.')
+legend('Ref.')
+subplot(3,1,3)
+% plot(tSim, rad2deg(angRate_LB_B_est(3,:)),'b'); hold on;grid on;
+plot(tSim, rad2deg(angRate_LB_B_ref(3,1:enddata)),'b'); hold on;grid on;
+ylabel('psi [deg/s]');
+% legend('fLaINSest','Ref.')
+legend('Ref.')
+xlabel('time [s]');
+
 %% pure mid integration results
 e3 = estimatorv3(window_size, X_init);
 
@@ -501,7 +676,7 @@ for i = 1:enddata
     
     %if mod(i,step) == 1
     if i == 1    
-        e3.testProcessPC(flag1,c);
+        e3.testProcessPC(flag1,c,0,0,0);
 %         Rs1(:,:,floor(i/step)+1) =e2.Rs(:,:,2);
 %         Ps1(:,floor(i/step)+1) =e2.Ps(:,2);
 %         Vs1(:,floor(i/step)+1) =e2.Ps(:,2);
@@ -515,11 +690,11 @@ end
 Qs1 = rotm2quatliub(Rs1);
 
 % 求最大欧氏距离差
-er3 = max(abs(vecnorm(Ps1(:,1:enddata)-posi_LB_L_ref(:,1:enddata))));
+er7 = max(abs(vecnorm(Ps1(:,1:enddata)-posi_LB_L_ref(:,1:enddata))));
 % 求最终欧氏距离差
-% er3 = vecnorm(Ps1(:,enddata))-vecnorm(posi_LB_L_ref(:,enddata));
+% er7 = vecnorm(Ps1(:,enddata))-vecnorm(posi_LB_L_ref(:,enddata));
 
-%er3 = sum(abs(Ps1(:,1:enddata)-posi_LB_L_ref(:,1:enddata)),'all');
+%er7 = sum(abs(Ps1(:,1:enddata)-posi_LB_L_ref(:,1:enddata)),'all');
 %% （过去的代码）estimator 增加了outputState 和outputdeltag的功能，测试下能否正常运行
 %转换成simulink model的时候可以把for 里面的东西直接复制，参考刘博KF修改，主要是保存上一帧的状态last_x
 
@@ -576,7 +751,6 @@ for i = 1:enddata
     Vs(:,i) = V;
     Ba(:,i) = Ba;
     Bg(:,i) = Bg;
-    
     
 
 %     if i < datastep

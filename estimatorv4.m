@@ -1,4 +1,4 @@
-classdef estimatorv3 < handle
+classdef estimatorv4 < handle
     properties
         
         %         acc_1;
@@ -60,11 +60,20 @@ classdef estimatorv3 < handle
         bgContainer;%3*10
         dtContainer;
         
+        % variables related to relative navigation framework
+        R_LN;
+        posi_LN_L;
+        effGrav_N;
+        XnewIni;
+        posi_LB_L;
+        R_LB;
+        base_state;
+        
         count;% just for test processPC
     end
     methods
         %!these 4 variables should be references
-        function obj = estimatorv3(window_size, X_init)
+        function obj = estimatorv4(window_size, X_init)
             if nargin >= 1
                 obj.window_size = window_size;
             else
@@ -79,6 +88,9 @@ classdef estimatorv3 < handle
             obj.Qs(:,1) = X_init(7:10);
             obj.Rs = repmat(eye(3),1,1,obj.window_size+1);
             obj.Rs(:,:,1) = quat2rotmliub(obj.Qs(:,1)).';
+            obj.base_state = zeros(7,1);
+            obj.base_state(1:3,1) = X_init(1:3);
+            obj.base_state(4:7,1) = X_init(7:10);
             
             obj.Bas = zeros(3,obj.window_size+1);
             obj.Bgs = zeros(3,obj.window_size+1);
@@ -122,6 +134,13 @@ classdef estimatorv3 < handle
             %             obj.noise = zeros(18,18);
             %             setNoise(obj);
             
+            % variables related to relative navigation framework
+            obj.R_LN = eye(3);
+            obj.posi_LN_L = zeros(3,1);
+            obj.effGrav_N = [0;0;1];
+            obj.XnewIni = zeros(10,1);
+            obj.posi_LB_L = zeros(3,1);
+            obj.R_LB = eye(3);
         end
         
         function processIMU(obj,dt,linear_acceleration,angular_velocity,gravity_T)
@@ -130,15 +149,17 @@ classdef estimatorv3 < handle
             global angRate_IT_T
             global angRate_IL_L;
             % calculate the effective gravitation
-            effGrav_T = gravity_T - cross(angRate_IT_T,cross(angRate_IT_T, posi_TL_T + R_LT* obj.Ps(:,obj.frame_count)));
-            effGrav_L = R_LT' * effGrav_T;
-            
+            obj.posi_LB_L = obj.R_LN' * obj.Ps(:,obj.frame_count) + obj.posi_LN_L;
+            effGrav_T = gravity_T - cross(angRate_IT_T,cross(angRate_IT_T, posi_TL_T + R_LT* obj.posi_LB_L));
+            % effGrav_L = R_LT' * effGrav_T;
+            obj.effGrav_N = obj.R_LN * R_LT' * effGrav_T;
+
             %1.初始化，如果当前帧不是第一帧IMU，那么就把它看成第一个IMU，而且把他的值取出来作为初始值
             if (~obj.first_imu)
                 obj.first_imu = true;
                 obj.acc_0 = linear_acceleration;
                 obj.gyr_0 = angular_velocity - obj.Rs(:,:,obj.frame_count).' * angRate_IL_L;
-                current_a = obj.Rs(:,:,obj.frame_count) * (linear_acceleration - obj.Bas(:,obj.frame_count)) + effGrav_L - 2 * cross(angRate_IL_L, obj.Vs(:,obj.frame_count));
+                current_a = obj.Rs(:,:,obj.frame_count) * (linear_acceleration - obj.Bas(:,obj.frame_count)) + obj.effGrav_N - 2 * cross(angRate_IL_L, obj.Vs(:,obj.frame_count));
                 % obj.gyr_B_0 = angular_velocity - obj.Rs(:,:,obj.frame_count).' * angRate_IL_L;
                 % obj.previous_a_sup = effGrav_L - 2 * cross(angRate_IL_L, obj.Vs(:,obj.frame_count));
             end
@@ -170,13 +191,13 @@ classdef estimatorv3 < handle
 %                     obj.new_frame = 0;
 %                 end 
                 
-                obj.g_sum(:,j) = obj.g_sum(:,j) + 0.5 * dt * dt * effGrav_L;
+                obj.g_sum(:,j) = obj.g_sum(:,j) + 0.5 * dt * dt * obj.effGrav_N;
                 % angRate_IB_B - obj.Rs(:,:,j).' * angRate_IL_L;
                 % un_acc_0 = obj.Rs(:,:,j) * (obj.acc_0 - obj.Bas(:,j)) + obj.previous_a_sup;% 这里都应该是上一时刻的数据
                 un_gyr = 0.5 * (obj.gyr_0 + current_g) - obj.Bgs(:,j);% !! Bgs(j)
                 un_gyr = un_gyr * dt;
                 obj.Rs(:,:,j) =obj.Rs(:,:,j)*quat2rotmliub([un_gyr(1)/2,un_gyr(2)/2,un_gyr(3)/2,1]).';
-                current_a = obj.Rs(:,:,j) * (linear_acceleration - obj.Bas(:,j)) + effGrav_L - 2 * cross(angRate_IL_L, obj.Vs(:,obj.frame_count));% 这里都应该是这一时刻的数据
+                current_a = obj.Rs(:,:,j) * (linear_acceleration - obj.Bas(:,j)) + obj.effGrav_N - 2 * cross(angRate_IL_L, obj.Vs(:,obj.frame_count));% 这里都应该是这一时刻的数据
                 un_acc = 0.5 * (obj.previous_a + current_a);
                 obj.Ps(:,j) =obj.Ps(:,j) + dt * obj.Vs(:,j) + 0.5 * dt * dt * un_acc;
                 obj.Vs(:,j) =obj.Vs(:,j) + dt * un_acc;
@@ -186,44 +207,10 @@ classdef estimatorv3 < handle
             % previous_g = current_g;
             % obj.previous_a_sup = current_a_sup; % 将这一时刻的数据存下来给下一时刻用
             obj.previous_a = current_a;
-        end
-        
-        function testProcessIMU(obj,dt,linear_acceleration,angular_velocity)
-            %1.初始化，如果当前帧不是第一帧IMU，那么就把它看成第一个IMU，而且把他的值取出来作为初始值
-            if (~obj.first_imu)
-                obj.first_imu = true;
-                obj.acc_0 = linear_acceleration;
-                obj.gyr_0 = angular_velocity;
-            end
-            % 注意此处是使用上一个历元的IMU数据!因此first_imu的设置还是有作用的
-            if (length(obj.pre_integrations)<(obj.frame_count))
-                obj.pre_integrations = [obj.pre_integrations IntegrationBasev2(obj.acc_0, obj.gyr_0, obj.Bas(obj.frame_count), obj.Bgs(obj.frame_count))];
-            end
-            
-            if (obj.frame_count ~= 1)
-                
-                obj.pre_integrations(obj.frame_count).push_back(dt, linear_acceleration, angular_velocity);
-                %if(solver_flag != NON_LINEAR)
-                %    tmp_pre_integration->push_back(dt, linear_acceleration, angular_velocity);
-                
-                obj.dt_buf=[obj.dt_buf,dt];
-                obj.acc_buf=[obj.acc_buf,linear_acceleration];
-                obj.gyr_buf=[obj.gyr_buf,angular_velocity];
-                
-                j = obj.frame_count;
-                global g
-                un_acc_0 = obj.Rs(:,:,j) * (obj.acc_0 - obj.Bas(:,j)) - g;
-                un_gyr = 0.5 * (obj.gyr_0 + angular_velocity) - obj.Bgs(:,j);% !! Bgs(j)
-                un_gyr = un_gyr * dt;
-                obj.Rs(:,:,j) =obj.Rs(:,:,j)*quat2rotmliub([un_gyr(1)/2,un_gyr(2)/2,un_gyr(3)/2,1]).';
-                un_acc_1 = obj.Rs(:,:,j) * (linear_acceleration - obj.Bas(:,j)) - g;% !! Bas(j)
-                un_acc = 0.5 * (un_acc_0 + un_acc_1);
-                obj.Ps(:,j) =obj.Ps(:,j)+ dt * obj.Vs(:,j) + 0.5 * dt * dt * un_acc;
-                obj.Vs(:,j) =obj.Vs(:,j)+ dt * un_acc;
-            end
-            obj.acc_0 = linear_acceleration;%应该是用来初始化IntegrationBase，每来一次数据都更新但是只有framecount+1的时候才用到
-            obj.gyr_0 = angular_velocity;
-        end
+            % 在这里更新下Pose in L
+            obj.posi_LB_L = obj.R_LN' * obj.Ps(:,obj.frame_count) + obj.posi_LN_L;
+            obj.R_LB = obj.Rs(:,:,obj.frame_count)'*obj.R_LN;
+        end        
         
         function processPC(obj,pc,params)
             process(pc)
@@ -261,7 +248,7 @@ classdef estimatorv3 < handle
             %% 测试10个frame的imu积分
             if(flag == 2)
                 if obj.frame_count == obj.window_size + 1
-                    optimization(obj)
+                    %optimization(obj)
                     slide_window(obj,1,2,3);
                 else
                     obj.frame_count = obj.frame_count + 1;
@@ -278,7 +265,11 @@ classdef estimatorv3 < handle
                 else
                     obj.deltaT2last(:,obj.frame_count-1) = deltaX_icp2last;
                     obj.deltaT2base = deltaX_icp2base;
-                    %optimization(obj)
+                    optimization(obj)
+                end
+                % change node frame
+                if (flagNewNode == 1)
+                    changeNodeFrame(obj)
                 end
                 
                 if obj.frame_count == obj.window_size + 1
@@ -292,11 +283,9 @@ classdef estimatorv3 < handle
                     obj.Bgs(:,obj.frame_count) =obj.Bgs(:,obj.frame_count-1);
                     obj.new_frame = 1;
                 end
-            end     
-            % change node frame
-            if (flagNewNode == 1)
-                changeNodeFrame();
+
             end
+
         end
         
         function optimization(obj)
@@ -327,10 +316,14 @@ classdef estimatorv3 < handle
                 global ICP_N_q;
                 ICP_N_t_ = ICP_N_t;
                 ICP_N_q_ = ICP_N_q;
-            [para_pose,para_speedbias] = ceres_optimization(obj.Ps,obj.Rs,obj.Qs,obj.Vs,obj.Bas,obj.Bgs,...
+%             [para_pose,para_speedbias] = ceres_optimization(obj.Ps,obj.Rs,obj.Qs,obj.Vs,obj.Bas,obj.Bgs,...
+%                 obj.dpContainer,obj.dqContainerArray,obj.dvContainer,obj.JContainer,obj.PContainer,...
+%                 obj.baContainer,obj.bgContainer,obj.dtContainer,obj.deltaT2last,obj.deltaT2base,obj.frame_count,obj.g_sum,ICP_N_t_,ICP_N_q_);
+ 
+            [para_pose,para_speedbias] = ceres_optimization_allresidualssamenoise(obj.Ps,obj.Rs,obj.Qs,obj.Vs,obj.Bas,obj.Bgs,...
                 obj.dpContainer,obj.dqContainerArray,obj.dvContainer,obj.JContainer,obj.PContainer,...
                 obj.baContainer,obj.bgContainer,obj.dtContainer,obj.deltaT2last,obj.deltaT2base,obj.frame_count,obj.g_sum,ICP_N_t_,ICP_N_q_);
-            
+
 %             [para_pose,para_speedbias] = ceres_optimization_onlyPC(obj.Ps,obj.Rs,obj.Qs,obj.Vs,obj.Bas,obj.Bgs,...
 %                 obj.dpContainer,obj.dqContainerArray,obj.dvContainer,obj.JContainer,obj.PContainer,...
 %                 obj.baContainer,obj.bgContainer,obj.dtContainer,obj.deltaT2last,obj.deltaT2base,obj.frame_count,obj.g_sum,ICP_N_t_,ICP_N_q_);
@@ -340,8 +333,8 @@ classdef estimatorv3 < handle
 %                 obj.baContainer,obj.bgContainer,obj.dtContainer,obj.deltaT2last,obj.deltaT2base,obj.frame_count,obj.g_sum);
             
             % return
-            para_pose = reshape(para_pose,[7,11]).';
-            para_speedbias = reshape(para_speedbias,[9,11]).';
+            para_pose = reshape(para_pose,[7,obj.window_size+1]).';
+            para_speedbias = reshape(para_speedbias,[9,obj.window_size+1]).';
 
             
             % 计算初始位置的R的偏移，先用ypr 如果不行，直接算R的差
@@ -354,8 +347,13 @@ classdef estimatorv3 < handle
                 disp(["euler singular point!"]);
                 rot_diff = obj.Rs(:,:,1) * quat2rotmliub([para_pose(1,4),para_pose(1,5),para_pose(1,6),para_pose(1,7)]).'.';
             end
-            % 不对第一帧的位姿进行处理
+            % 不对第一帧的姿态进行处理
             % rot_diff = [1 0 0;0 1 0;0 0 1];
+            % 不对第一帧的位置进行处理,结果不好
+            % origin_P0 = [para_pose(1,1);para_pose(1,2);para_pose(1,3)];
+            
+            %对第一帧的姿态进行全处理,默认位姿是全处理的
+            rot_diff = obj.Rs(:,:,1)* quat2rotmliub([para_pose(1,4),para_pose(1,5),para_pose(1,6),para_pose(1,7)]);
             
             for i = 1:obj.frame_count
            
@@ -405,20 +403,99 @@ classdef estimatorv3 < handle
             V = obj.Vs(:,obj.frame_count);
             Ba = obj.Bas(:,obj.frame_count);
             Bg = obj.Bgs(:,obj.frame_count);
+%             obj.posi_LB_L = obj.R_LN' * obj.Ps(:,obj.frame_count) + obj.posi_LN_L;
+%             obj.R_LB = obj.Rs(:,:,obj.frame_count)'*obj.R_LN;
         end
         
         function [g_sum_] = outputDeltaG(obj)
             g_sum_ = obj.g_sum(:,obj.frame_count);
         end
         
+        function [newIniState] = outputXNewInit(obj)
+            newIniState = obj.XnewIni;
+        end
         function changeNodeFrame(obj)
             %求Nj2Ni
+            dir_N1 = [0 0 1]';
+            dir_Grav = obj.effGrav_N/norm(obj.effGrav_N);
+            rotAng = acos(dot(dir_N1, dir_Grav));
+            rotaxis_temp = cross(dir_N1,dir_Grav);
+            rotaxis = rotaxis_temp / norm(rotaxis_temp);
+            quat_N2_1Grav = [rotaxis * sin(rotAng/2); cos(rotAng/2)];
+            R_N1N2 = quat2rotmliub(quat_N2_1Grav);% N1到N2的坐标变换
+            posi_N1N2_N1 = obj.Ps(:,obj.frame_count);
             %convert BinNi to BinNj
+            PbaseinN2 = zeros(3,1);
+            VbaseinN2 = R_N1N2*obj.Vs(:,obj.frame_count);
+            RbaseN2 = R_N1N2*obj.Rs(:,:,obj.frame_count);
+            QN2base = rotm2quatliub(RbaseN2');
+            obj.XnewIni = [PbaseinN2;VbaseinN2;QN2base];
             %更新N2L
-            %清空state，或者说重新做一次构造函数初始化
+            obj.posi_LN_L = obj.posi_LN_L + obj.R_LN'*posi_N1N2_N1;
+            obj.R_LN = R_N1N2*obj.R_LN;
+            %清空state，或者说重新做一次构造函数初始化的state部分
+            initialize(obj)
             %framecount置1
-            %用BinNj 做为init 初始化一下所有的状态
+            %用BinNj 做为init 初始化一下flprocessing
             
         end
+        
+        function initialize(obj)
+            obj.Ps = zeros(3,obj.window_size+1);
+            obj.Ps(:,1) = obj.XnewIni(1:3);
+            obj.Vs = zeros(3,obj.window_size+1);
+            obj.Vs(:,1) = obj.XnewIni(4:6);
+            %obj.Qs = quaternion(rand(obj.window_size+1,4));
+            obj.Qs = zeros(4,obj.window_size+1);
+            obj.Qs(:,1) = obj.XnewIni(7:10);
+            obj.Rs = repmat(eye(3),1,1,obj.window_size+1);
+            obj.Rs(:,:,1) = quat2rotmliub(obj.Qs(:,1)).';
+            
+            obj.base_state = zeros(7,1);
+            obj.base_state(1:3,1) = obj.XnewIni(1:3);
+            obj.base_state(4:7,1) = obj.XnewIni(7:10);
+            
+            obj.Bas = zeros(3,obj.window_size+1);
+            obj.Bgs = zeros(3,obj.window_size+1);
+            %g_sum(:,i+1) 是Ps(:,i)和Ps(:,i+1)之间的重力积分和，所以第一个值不使用
+            obj.g_sum = zeros(3,obj.window_size+1);
+            obj.first_imu = false;
+            obj.dt_buf = [];
+            obj.acc_buf = [];
+            obj.gyr_buf = [];
+            obj.count = 1;
+            obj.frame_count = 1;
+            obj.new_frame = 0;
+            obj.pre_integrations = [];
+            obj.pre_integrations = [obj.pre_integrations IntegrationBasev2(obj.acc_0, obj.gyr_0, obj.Bas(obj.frame_count), obj.Bgs(obj.frame_count))];
+            % obj.pc = ;
+            obj.deltaT2last = zeros(7,obj.window_size);%results of icp to last pc,7*11,the first value will not be used
+            obj.deltaT2base = zeros(7,1);%results of icp to base pc,7*1
+            %obj.first_scan = 1;
+            
+            obj.dpContainer = zeros(3,obj.window_size+1);%3*10
+            %obj.dqContainer = quaternion(zeros(obj.window_size,4));%10*4
+            obj.dqContainerArray = zeros(4,obj.window_size);%4*10
+            obj.dvContainer = zeros(3,obj.window_size);%3*10
+            obj.JContainer = zeros(15,15,obj.window_size);%15*15*10
+            obj.PContainer = zeros(15,15,obj.window_size);%15*15*10
+            obj.baContainer = zeros(3,obj.window_size);%3*10
+            obj.bgContainer = zeros(3,obj.window_size);%3*10
+            obj.dtContainer = zeros(1,obj.window_size);%3*10
+            %             obj.Ps = initial_acc_0;
+            %             obj.gyr_0 = initial_gyr_0;
+            %             obj.linearized_acc = initial_acc_0;
+            %             obj.linearized_gyr = initial_gyr_0;
+            %             obj.linearized_ba = initial_linearized_ba;
+            %             obj.linearized_bg = initial_linearized_bg;
+            %             obj.jacobian = eye(15);
+            %             obj.covariance = zeros(15,15);
+            %             obj.sum_dt = 0;%默认为double
+            %             obj.delta_p = zeros(3,1);
+            %             obj.delta_q = quaternion(1,0,0,0);%四元数的表达方式
+            %             obj.delta_v = zeros(3,1);
+            %             obj.noise = zeros(18,18);
+            %             setNoise(obj);        
+        end 
     end
 end

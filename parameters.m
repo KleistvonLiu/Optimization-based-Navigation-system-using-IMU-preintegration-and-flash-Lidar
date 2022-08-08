@@ -58,16 +58,19 @@ param_gyrox_bi.B       = 5e-4/3 * pi/180/3600; % [rad/s]
 % ACC_W=ACC_N*ACC_N;
 % GYR_W=GYR_N*GYR_N;
 
-factor1 = 1e-1;%1e-1;
-factor2 = 1e-1;%1e+6;
+factor1 = 7e-3;%1e-1;
+factor2 = 1e-4;%1e+6;
+factor21 = 1e+0;
 
 ACC_N=factor1*sqrt(whiteNoiseAcc.PSD/whiteNoiseAcc.Ts);%
-GYR_N=factor1*sqrt(whiteNoiseGyro.PSD/whiteNoiseGyro.Ts);
+GYR_N=factor21*factor1*sqrt(whiteNoiseGyro.PSD/whiteNoiseGyro.Ts);
 ACC_W=factor2*sqrt(0.664*param_accx_bi.B);
-GYR_W=factor2*sqrt(0.664*param_gyrox_bi.B);
+GYR_W=factor21*factor2*sqrt(0.664*param_gyrox_bi.B);
 
-ICP_N_t = 1e-2;
-ICP_N_q = 1e-1;
+%factor3 = 1e-0;
+% 1e-2和1e+2
+ICP_N_t = 5e-2;%1e-2
+ICP_N_q = 1e-1;%1e+2
 
 
 %g = [0;0;0];% 0 for IMUmeas data

@@ -1,5 +1,6 @@
 function [deltaX_icp2base, deltaX_icp2last,flagRegFinished, consec2base,...
-    deltaX2base_ref, deltaX2last_ref,numValidPoints, mHRF] = fLProcessing(...
+    deltaX2base_ref, deltaX2last_ref,flagNewNode,erricp2base,erricp2last,...
+    numValidPoints, mHRF] = fLProcessing(...
     pose_ref, Xn_pose_cur,...
     fL1MeasArrayDir, fL1MeasArrayRange, fL1MeasFlagNewData,...
     navMode, flagUseTrueRelStates,computeICP2base,...                               %input
@@ -25,6 +26,7 @@ if isempty(state_last_ref), state_last_ref = zeros(6,1);end
 
 
 deltaX_icp2base = zeros(7,1); %ICP结果的差
+erricp2base = 0;
 deltaX_g = zeros(7,1); %guess of relative transformation
 deltaX2base_ref = zeros(7,1); % referece icp results
 %deltaX_icp = zeros(7,1); % icp results
@@ -35,7 +37,9 @@ numValidPoints = 0;
 
 deltaX_icp2last = zeros(7,1); %ICP结果的差
 deltaX2last_ref = zeros(7,1); %ICP结果的差
+erricp2last = 0;
 
+flagNewNode = 0;%是否定义一个新的node frame
 
 coder.extrinsic('pcRegistration'); %!!!attention: to be modified
 % no new fL1Measurement, skip matching algorithm
@@ -160,6 +164,7 @@ else
         first_scan = 0;        
         second_scan = 1;
         flagRegFinished = 1;
+        %flagNewNode = 1;
         
         deltaX_icp2base = zeros(7,1); %ICP结果的差
         deltaX_icp2last = zeros(7,1); %ICP结果的差
@@ -205,33 +210,35 @@ else
             if(flagUseTrueRelStates >0.5)
                 deltaX_icp2base = deltaX2base_ref;
             else
-                [T2base, ~] = pcicpFL_LJF_V2_mex(curPc_B_sampled, basePc, params4base);
+                [T2base, erricp2base] = pcicpFL_LJF_V2_mex(curPc_B_sampled, basePc, params4base);
                 deltaX_icp2base(1:3,1) = T2base(1:3,4);
                 deltaX_icp2base(4:7,1) = rotm2quatliub(T2base(1:3,1:3).');
             end
             
-            %         % -- check overlapping area and change base PC if necessary
-            % %         deltaEulAng = quat2eulAngliub(deltaX_cur(4:7));
-            %         eulAng_base_cur = rotm2eulAngliub(R_base_cur);
-            %
-            %         flagOverlappingThreshold = ...
-            %             (abs(Xn_pose_cur(1) - state_basePc(1) + eulAng_base_cur(2) * mHRF)>1.4)||...
-            %             (abs(Xn_pose_cur(2) - state_basePc(2) - eulAng_base_cur(1) * mHRF)>1.4)||...
-            %              (abs(mHRF - mHRF_basePc)>0.15*abs(mHRF_basePc))||...
-            %              (abs(eulAng_base_cur(3))>(10/180*pi));
-            %
-            %                 %(abs(Xn_pose_cur(3) - state_basePc(3))>0.15*abs(state_basePc(3)))
-            %
-            % %         if(flagOverlappingThreshold ||(mHRF < 1))
-            %         if(flagOverlappingThreshold)
-            % %         if(true)
-            %             % consecutive INS nominal states and point cloud
-            %             state_basePc = Xn_pose_cur;
-            %             state_base_ref = pose_ref;
-            %             mHRF_basePc = mHRF;
-            %             basePc = curPc_B_sampled;
-            %             first2base = 1;
-            %         end
+                    % -- check overlapping area and change base PC if necessary
+            %         deltaEulAng = quat2eulAngliub(deltaX_cur(4:7));
+                    eulAng_base_cur = quat2eulAngliub(deltaX_icp2base(4:7,1));
+            
+                    flagOverlappingThreshold = ...
+                        (abs(deltaX_icp2base(1,1))>1.0)||...
+                        (abs(deltaX_icp2base(2,1))>1.0)||...
+                         (abs(deltaX_icp2base(3,1))>7)||...
+                         (abs(eulAng_base_cur(3))>(7/180*pi));
+            
+                            %(abs(Xn_pose_cur(3) - state_basePc(3))>0.15*abs(state_basePc(3)))
+            
+            %         if(flagOverlappingThreshold ||(mHRF < 1))
+                    if(flagOverlappingThreshold)
+                     %if(false)
+                        % consecutive INS nominal states and point cloud
+                        state_basePc = Xn_pose_cur;
+                        state_base_ref = pose_ref;
+                        mHRF_basePc = mHRF;
+                        basePc = curPc_B_sampled;
+                        first2base = 1;
+                        first_scan = 1;
+                        flagNewNode = 1;
+                    end
         end
         % icp to last point cloud
         % -- compute initial guess of transformation matrix for ICP
@@ -271,7 +278,7 @@ else
         if(flagUseTrueRelStates >0.5)
             deltaX_icp2last = deltaX2last_ref;
         else
-            [T2last, ~] = pcicpFL_LJF_V2_mex(curPc_B_sampled, lastPc, params4last);
+            [T2last, erricp2last] = pcicpFL_LJF_V2_mex(curPc_B_sampled, lastPc, params4last);
             deltaX_icp2last(1:3,1) = T2last(1:3,4);
             deltaX_icp2last(4:7,1) = rotm2quatliub(T2last(1:3,1:3).');
         end        

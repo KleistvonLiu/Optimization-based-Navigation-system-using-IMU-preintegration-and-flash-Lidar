@@ -22,4 +22,4 @@ enum NoiseOrder
 };
 
 double SOLVER_TIME = 1.0;
-int NUM_ITERATIONS = 50;
+int NUM_ITERATIONS = 25;
