@@ -480,7 +480,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
     }
   ceres::CostFunction *cost_function_base = PCfactor::Create(dpICP2base, dqICP2base,ICP_N_t,ICP_N_q);
   //problem.AddResidualBlock(cost_function_base, NULL, para_Pose[0], para_Pose[frame_count-1]);
-  problem.AddResidualBlock(cost_function_base, NULL, base_state, para_Pose[frame_count-1]);
+//   problem.AddResidualBlock(cost_function_base, NULL, base_state, para_Pose[frame_count-1]);
         
   ceres::Solver::Options options;
   

@@ -1,6 +1,6 @@
 function [deltaX_icp2base, deltaX_icp2last,flagRegFinished, consec2base,...
     deltaX2base_ref, deltaX2last_ref,flagNewNode,erricp2base,erricp2last,...
-    numValidPoints, mHRF] = fLProcessing(...
+    numValidPoints, mHRF,deltaX_icp2base_g,deltaX_icp2last_g] = fLProcessing(...
     pose_ref, Xn_pose_cur,...
     fL1MeasArrayDir, fL1MeasArrayRange, fL1MeasFlagNewData,...
     navMode, flagUseTrueRelStates,computeICP2base,...                               %input
@@ -38,6 +38,9 @@ numValidPoints = 0;
 deltaX_icp2last = zeros(7,1); %ICP结果的差
 deltaX2last_ref = zeros(7,1); %ICP结果的差
 erricp2last = 0;
+
+deltaX_icp2base_g = zeros(7,1);
+deltaX_icp2last_g = zeros(7,1);
 
 flagNewNode = 0;%是否定义一个新的node frame
 
@@ -194,7 +197,7 @@ else
             params4base.initialTransform(1:3, 1:3) = R_base_cur;
             params4base.initialTransform(1:3,4) = p_d;
             
-            %deltaX_g = [p_d;q_d];
+            deltaX_icp2base_g = [p_d;q_d];
             
             % -- compute reference relative transformation
             R_base_ref = eulAng2rotmliub(state_base_ref(4:6));
@@ -205,6 +208,10 @@ else
             
             q_base_ref_inv = [-q_base_ref(1:3); q_base_ref(4)];
             deltaX2base_ref(4:7,1) = quatMultiplication(q_base_ref_inv, q_cur_ref);
+            
+            R_cur_ref = eulAng2rotmliub(pose_ref(4:6));
+            R_base_cur_ref = R_cur_ref*R_base_ref';
+            deltaX2last_ref(4:7,1) = rotm2quatliub(R_base_cur_ref);
             
             % -- compute ICP relative transformation
             if(flagUseTrueRelStates >0.5)
@@ -223,13 +230,13 @@ else
                         (abs(deltaX_icp2base(1,1))>1.0)||...
                         (abs(deltaX_icp2base(2,1))>1.0)||...
                          (abs(deltaX_icp2base(3,1))>7)||...
-                         (abs(eulAng_base_cur(3))>(7/180*pi));
+                         (mod(abs(eulAng_base_cur(3)),3.14159)>(10/180*pi));
             
                             %(abs(Xn_pose_cur(3) - state_basePc(3))>0.15*abs(state_basePc(3)))
             
             %         if(flagOverlappingThreshold ||(mHRF < 1))
                     if(flagOverlappingThreshold)
-                     %if(false)
+                    %if(false)
                         % consecutive INS nominal states and point cloud
                         state_basePc = Xn_pose_cur;
                         state_base_ref = pose_ref;
@@ -262,8 +269,8 @@ else
         
         params4last.initialTransform(1:3, 1:3) = R_base_cur;
         params4last.initialTransform(1:3,4) = p_d;
-        %deltaX_g_last = [p_d;q_d];
-        
+        deltaX_icp2last_g = [p_d;q_d];
+            
         % -- compute reference relative transformation
         R_base_ref = eulAng2rotmliub(state_last_ref(4:6));
         deltaX2last_ref(1:3,1) = R_base_ref * (pose_ref(1:3) - state_last_ref(1:3));
@@ -273,7 +280,11 @@ else
 
         q_base_ref_inv = [-q_base_ref(1:3); q_base_ref(4)];
         deltaX2last_ref(4:7,1) = quatMultiplication(q_base_ref_inv, q_cur_ref);
-
+        
+        R_cur_ref = eulAng2rotmliub(pose_ref(4:6));
+        R_base_cur_ref = R_cur_ref*R_base_ref';
+        deltaX2last_ref(4:7,1) = rotm2quatliub(R_base_cur_ref);
+        
         % -- compute ICP relative transformation
         if(flagUseTrueRelStates >0.5)
             deltaX_icp2last = deltaX2last_ref;

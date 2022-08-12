@@ -23,7 +23,9 @@ window_size = 5;
 c = 50;% frame size = 50 imu data points
 
 %load data 
-load('D:\GOG\DA\code\usefuldatafromNavFramework.mat')
+%load('D:\GOG\DA\code\data\usefuldatafromNavFramework.mat')
+load('D:\GOG\DA\code\data\simResults03_FS04_Case20useful.mat')
+
 
 %%
 % initial pose of B in L
@@ -88,7 +90,7 @@ params4last.verbose = false;
 params4last.useDegree = false;
 params4last.arrayDim = 85;%sqrt(size(fixedPc,1));
 
-enddata = 5001; %length(accdata);%length(acc)
+enddata = 15001;%length(accdata); %length(accdata);%length(acc)
 step = 100;%every 100 imu data, we have 1 pc data
 erricp2base = zeros(enddata,1);
 erricp2last = zeros(enddata,1);
@@ -100,11 +102,11 @@ end
 for i = 1:length(eulAng_LB_ref)
     R_LB_ref(:,:,i) = eulAng2rotmliub(eulAng_LB_ref(:,i));
 end
-for i = 1:size(eulAng_LB_ref,2)
-    
-    eulAng_LB_ref(:,i) = rad2deg(eulAng_LB_ref(:,i));
-    
-end
+% for i = 1:size(eulAng_LB_ref,2)
+%     
+%     eulAng_LB_ref(:,i) = rad2deg(eulAng_LB_ref(:,i));
+%     
+% end
 acc_LB_L_ref = downsample(acc_LB_L_ref,100);
 acc_LB_L_ref = acc_LB_L_ref.';
 %% 相较于estimatorv3,v4是基于relative navigation的
@@ -131,9 +133,9 @@ for i = 1:enddata
         [P,~,R,~,~,~] = e4.outputState();
         Xn_pose_cur = [P; rotm2quatliub(R.')];
         
-        [deltaX_icp2base, deltaX_icp2last,flagRegFinished, consec2base,...
-            deltaX2base_ref, deltaX2last_ref,flagNewNode,erricp2base(i),erricp2last(i),...
-            numValidPoints, mHRF] = fLProcessing(...
+        [deltaX_icp2base(:,floor(i/100)+1), deltaX_icp2last(:,floor(i/100)+1),flagRegFinished, consec2base,...
+            deltaX2base_ref(:,floor(i/100)+1), deltaX2last_ref(:,floor(i/100)+1),flagNewNode,erricp2base(i),erricp2last(i),...
+            numValidPoints, mHRF,deltaX_icp2base_g(:,floor(i/100)+1),deltaX_icp2last_g(:,floor(i/100)+1)] = fLProcessing(...
             pose_ref, Xn_pose_cur,...
             fL1MeasArrayDir, fL1MeasRange(:,:,i), fL1MeasFlagNewData,...
             navMode, flagUseTrueRelStates,computeICP2base,...                               %input
@@ -143,7 +145,7 @@ for i = 1:enddata
         
         %e.testProcessPC(flag,c);
         %e.ProcessPC(pc,params);
-        e4.testProcessPC(flag,c,deltaX_icp2base, deltaX_icp2last,flagNewNode);
+        e4.testProcessPC(flag,c,deltaX_icp2base(:,floor(i/100)+1), deltaX_icp2last(:,floor(i/100)+1),flagNewNode);
         
         if(flagNewNode==1)
             [P,~,R,~,~,~] = e4.outputState();
@@ -222,32 +224,32 @@ ern1 = sum(vecnorm(Ps(:,1:enddata)-posi_NB_N_ref(:,1:enddata)))/enddata;
 h(98) = figure('Name','Position in N');
 subplot(3,2,1)
 tSim = linspace(0,floor(enddata/10),enddata); 
-plot(tSim, Ps(1,:),'black'); hold on;grid on;
+plot(tSim, Ps(1,1:enddata),'black'); hold on;grid on;
 plot(tSim, posi_NB_N_ref(1,1:enddata),':r'); hold on;grid on;
 title('Position Estimation in N');
 ylabel('x [m]','FontSize',50);set(gca,'FontSize',15);
 legend('optEst','Ref. in N frame')
 subplot(3,2,3)
-plot(tSim, Ps(2,:),'black'); hold on;grid on;
+plot(tSim, Ps(2,1:enddata),'black'); hold on;grid on;
 plot(tSim, posi_NB_N_ref(2,1:enddata),':r'); hold on;grid on;
 legend('optEst','Ref. in N frame')
 ylabel('y [m]','FontSize',50);set(gca,'FontSize',15);
 subplot(3,2,5)
-plot(tSim, Ps(3,:),'black'); hold on;grid on;
+plot(tSim, Ps(3,1:enddata),'black'); hold on;grid on;
 plot(tSim, posi_NB_N_ref(3,1:enddata),':r'); hold on;grid on;
 legend('optEst','Ref. in N frame')
 ylabel('z [m]','FontSize',50);set(gca,'FontSize',15);
 xlabel('time [s]','FontSize',20);
 
 subplot(3,2,2)
-plot(tSim, Ps(1,:)-posi_NB_N_ref(1,1:enddata)); hold on;grid on;
+plot(tSim, Ps(1,1:enddata)-posi_NB_N_ref(1,1:enddata)); hold on;grid on;
 title('Position errors in N');
 ylabel('x (est-ref) [m]','FontSize',50);set(gca,'FontSize',15);
 subplot(3,2,4)
-plot(tSim, Ps(2,:)-posi_NB_N_ref(2,1:enddata)); hold on;grid on;
+plot(tSim, Ps(2,1:enddata)-posi_NB_N_ref(2,1:enddata)); hold on;grid on;
 ylabel('y (est-ref) [m]','FontSize',50);set(gca,'FontSize',15);
 subplot(3,2,6)
-plot(tSim, Ps(3,:)-posi_NB_N_ref(3,1:enddata)); hold on;grid on;
+plot(tSim, Ps(3,1:enddata)-posi_NB_N_ref(3,1:enddata)); hold on;grid on;
 ylabel('z (est-ref) [m]','FontSize',50);set(gca,'FontSize',15);
 xlabel('time [s]','FontSize',20);
 
@@ -255,73 +257,73 @@ h(97) = figure('Name','Norm of position difference(est-ref) in N');
 % subplot(3,2,1)
 % tSim = linspace(0,500,enddata); 
 plot(tSim, vecnorm(Ps(:,1:enddata)-posi_NB_N_ref(:,1:enddata)),'b'); hold on;grid on;
-title('Norm of position difference(est-ref)');
+title('Norm of position difference(est-ref) in N');
 ylabel('x [m]','FontSize',50);set(gca,'FontSize',15);
 legend('optEst')
 
 h(96) = figure('Name','Euler angles in N');
 subplot(3,2,1)
-plot(tSim, angles_N(1,:),'black'); hold on;grid on;
+plot(tSim, angles_N(1,1:enddata),'black'); hold on;grid on;
 plot(tSim, angles_ref_N(1,1:enddata),':r'); hold on;grid on;
-title('Euler angles Estimation');
+title('Euler angles Estimation in N');
 ylabel('roll [degree]','FontSize',50);set(gca,'FontSize',15);
 legend('optEst','Ref. in N frame')
 subplot(3,2,3)
-plot(tSim, angles_N(2,:),'black'); hold on;grid on;
+plot(tSim, angles_N(2,1:enddata),'black'); hold on;grid on;
 plot(tSim, angles_ref_N(2,1:enddata),':r'); hold on;grid on;
 legend('optEst','Ref. in N frame')
 ylabel('pitch [degree]','FontSize',50);set(gca,'FontSize',15);
 subplot(3,2,5)
-plot(tSim, angles_N(3,:),'black'); hold on;grid on;
+plot(tSim, angles_N(3,1:enddata),'black'); hold on;grid on;
 plot(tSim, angles_ref_N(3,1:enddata),':r'); hold on;grid on;
 legend('optEst','Ref. in N frame')
 ylabel('yaw [degree]','FontSize',50);set(gca,'FontSize',15);
 xlabel('time [s]','FontSize',20);
 
 subplot(3,2,2)
-plot(tSim, angles_N(1,:)-angles_ref_N(1,1:enddata)); hold on;grid on;
-title('Euler angles errors');
+plot(tSim, angles_N(1,1:enddata)-angles_ref_N(1,1:enddata)); hold on;grid on;
+title('Euler angles errors in N');
 ylabel('x (est-ref) [degree]','FontSize',50);set(gca,'FontSize',15);
 subplot(3,2,4)
-plot(tSim, angles_N(2,:)-angles_ref_N(2,1:enddata)); hold on;grid on;
+plot(tSim, angles_N(2,1:enddata)-angles_ref_N(2,1:enddata)); hold on;grid on;
 ylabel('y (est-ref) [degree]','FontSize',50);set(gca,'FontSize',15);
 subplot(3,2,6)
-plot(tSim, angles_N(3,:)-angles_ref_N(3,1:enddata)); hold on;grid on;
+plot(tSim, angles_N(3,1:enddata)-angles_ref_N(3,1:enddata)); hold on;grid on;
 ylabel('z (est-ref) [degree]','FontSize',50);set(gca,'FontSize',15);
 xlabel('time [s]','FontSize',20);
 %% visulization
 h(1) = figure('Name','Position');
 subplot(3,2,1)
 tSim = linspace(0,floor(enddata/10),enddata); 
-plot(tSim, posi_LB_L_est(1,:),'b'); hold on;grid on;
-plot(tSim, P_LB_L(1,:),'black'); hold on;grid on;
+plot(tSim, posi_LB_L_est(1,1:enddata),'b'); hold on;grid on;
+plot(tSim, P_LB_L(1,1:enddata),'black'); hold on;grid on;
 plot(tSim, posi_LB_L_ref(1,1:enddata),':r'); hold on;grid on;
 title('Position Estimation');
 ylabel('x [m]','FontSize',50);set(gca,'FontSize',15);
 legend('fLaINSest','optEst','Ref. in L frame')
 subplot(3,2,3)
-plot(tSim, posi_LB_L_est(2,:),'b'); hold on;grid on;
-plot(tSim, P_LB_L(2,:),'black'); hold on;grid on;
+plot(tSim, posi_LB_L_est(2,1:enddata),'b'); hold on;grid on;
+plot(tSim, P_LB_L(2,1:enddata),'black'); hold on;grid on;
 plot(tSim, posi_LB_L_ref(2,1:enddata),':r'); hold on;grid on;
 legend('fLaINSest','optEst','Ref. in L frame')
 ylabel('y [m]','FontSize',50);set(gca,'FontSize',15);
 subplot(3,2,5)
-plot(tSim, posi_LB_L_est(3,:),'b'); hold on;grid on;
-plot(tSim, P_LB_L(3,:),'black'); hold on;grid on;
+plot(tSim, posi_LB_L_est(3,1:enddata),'b'); hold on;grid on;
+plot(tSim, P_LB_L(3,1:enddata),'black'); hold on;grid on;
 plot(tSim, posi_LB_L_ref(3,1:enddata),':r'); hold on;grid on;
 legend('fLaINSest','optEst','Ref. in L frame')
 ylabel('z [m]','FontSize',50);set(gca,'FontSize',15);
 xlabel('time [s]','FontSize',20);
 
 subplot(3,2,2)
-plot(tSim, P_LB_L(1,:)-posi_LB_L_ref(1,1:enddata)); hold on;grid on;
+plot(tSim, P_LB_L(1,1:enddata)-posi_LB_L_ref(1,1:enddata)); hold on;grid on;
 title('Position errors');
 ylabel('x (est-ref) [m]','FontSize',50);set(gca,'FontSize',15);
 subplot(3,2,4)
-plot(tSim, P_LB_L(2,:)-posi_LB_L_ref(2,1:enddata)); hold on;grid on;
+plot(tSim, P_LB_L(2,1:enddata)-posi_LB_L_ref(2,1:enddata)); hold on;grid on;
 ylabel('y (est-ref) [m]','FontSize',50);set(gca,'FontSize',15);
 subplot(3,2,6)
-plot(tSim, P_LB_L(3,:)-posi_LB_L_ref(3,1:enddata)); hold on;grid on;
+plot(tSim, P_LB_L(3,1:enddata)-posi_LB_L_ref(3,1:enddata)); hold on;grid on;
 ylabel('z (est-ref) [m]','FontSize',50);set(gca,'FontSize',15);
 xlabel('time [s]','FontSize',20);
 
@@ -337,69 +339,69 @@ legend('fLaINSest','optEst')
 h(3) = figure('Name','Velocity');
 subplot(3,2,1)
 %tSim = linspace(0,500,enddata); 
-plot(tSim, vel_LB_L_est(1,:),'b'); hold on;grid on;
-plot(tSim, Vs(1,:),'black'); hold on;grid on;
+plot(tSim, vel_LB_L_est(1,1:enddata),'b'); hold on;grid on;
+plot(tSim, Vs(1,1:enddata),'black'); hold on;grid on;
 plot(tSim, vel_LB_L_ref(1,1:enddata),':r'); hold on;grid on;
 title('Velocity Estimation');
 ylabel('x [m/s]','FontSize',50);set(gca,'FontSize',15);
 legend('fLaINSest','optEst','Ref. in L frame')
 subplot(3,2,3)
-plot(tSim, vel_LB_L_est(2,:),'b'); hold on;grid on;
-plot(tSim, Vs(2,:),'black'); hold on;grid on;
+plot(tSim, vel_LB_L_est(2,1:enddata),'b'); hold on;grid on;
+plot(tSim, Vs(2,1:enddata),'black'); hold on;grid on;
 plot(tSim, vel_LB_L_ref(2,1:enddata),':r'); hold on;grid on;
 legend('fLaINSest','optEst','Ref. in L frame')
 ylabel('y [m/s]','FontSize',50);set(gca,'FontSize',15);
 subplot(3,2,5)
-plot(tSim, vel_LB_L_est(3,:),'b'); hold on;grid on;
-plot(tSim, Vs(3,:),'black'); hold on;grid on;
+plot(tSim, vel_LB_L_est(3,1:enddata),'b'); hold on;grid on;
+plot(tSim, Vs(3,1:enddata),'black'); hold on;grid on;
 plot(tSim, vel_LB_L_ref(3,1:enddata),':r'); hold on;grid on;
 legend('fLaINSest','optEst','Ref. in L frame')
 ylabel('z [m/s]','FontSize',50);set(gca,'FontSize',15);
 xlabel('time [s]','FontSize',20);
 
 subplot(3,2,2)
-plot(tSim, Vs(1,:)-vel_LB_L_ref(1,1:enddata)); hold on;grid on;
+plot(tSim, Vs(1,1:enddata)-vel_LB_L_ref(1,1:enddata)); hold on;grid on;
 title('Velocity errors');
 ylabel('x (est-ref) [m/s]','FontSize',50);set(gca,'FontSize',15);
 subplot(3,2,4)
-plot(tSim, Vs(2,:)-vel_LB_L_ref(2,1:enddata)); hold on;grid on;
+plot(tSim, Vs(2,1:enddata)-vel_LB_L_ref(2,1:enddata)); hold on;grid on;
 ylabel('y (est-ref) [m/s]','FontSize',50);set(gca,'FontSize',15);
 subplot(3,2,6)
-plot(tSim, Vs(3,:)-vel_LB_L_ref(3,1:enddata)); hold on;grid on;
+plot(tSim, Vs(3,1:enddata)-vel_LB_L_ref(3,1:enddata)); hold on;grid on;
 ylabel('z (est-ref) [m/s]','FontSize',50);set(gca,'FontSize',15);
 xlabel('time [s]','FontSize',20);
 
 h(4) = figure('Name','Euler angles');
 subplot(3,2,1)
-plot(tSim, eulAng_LB_est(1,:),'b'); hold on;grid on;
-plot(tSim, angles_L(1,:),'black'); hold on;grid on;
-plot(tSim, eulAng_LB_ref(1,1:enddata),':r'); hold on;grid on;
+plot(tSim, eulAng_LB_est(1,1:enddata),'b'); hold on;grid on;
+plot(tSim, angles_L(1,1:enddata),'black'); hold on;grid on;
+plot(tSim, rad2deg(eulAng_LB_ref(1,1:enddata)),':r'); hold on;grid on;
 title('Euler angles Estimation');
 ylabel('roll [degree]','FontSize',50);set(gca,'FontSize',15);
 legend('fLaINSest','optEst','Ref. in L frame')
 subplot(3,2,3)
-plot(tSim, eulAng_LB_est(2,:),'b'); hold on;grid on;
-plot(tSim, angles_L(2,:),'black'); hold on;grid on;
-plot(tSim, eulAng_LB_ref(2,1:enddata),':r'); hold on;grid on;
+plot(tSim, eulAng_LB_est(2,1:enddata),'b'); hold on;grid on;
+plot(tSim, angles_L(2,1:enddata),'black'); hold on;grid on;
+plot(tSim, rad2deg(eulAng_LB_ref(2,1:enddata)),':r'); hold on;grid on;
 legend('fLaINSest','optEst','Ref. in L frame')
 ylabel('pitch [degree]','FontSize',50);set(gca,'FontSize',15);
 subplot(3,2,5)
-plot(tSim, eulAng_LB_est(3,:),'b'); hold on;grid on;
-plot(tSim, angles_L(3,:),'black'); hold on;grid on;
-plot(tSim, eulAng_LB_ref(3,1:enddata),':r'); hold on;grid on;
+plot(tSim, eulAng_LB_est(3,1:enddata),'b'); hold on;grid on;
+plot(tSim, angles_L(3,1:enddata),'black'); hold on;grid on;
+plot(tSim, rad2deg(eulAng_LB_ref(3,1:enddata)),':r'); hold on;grid on;
 legend('fLaINSest','optEst','Ref. in L frame')
 ylabel('yaw [degree]','FontSize',50);set(gca,'FontSize',15);
 xlabel('time [s]','FontSize',20);
 
 subplot(3,2,2)
-plot(tSim, angles_L(1,:)-eulAng_LB_ref(1,1:enddata)); hold on;grid on;
+plot(tSim, angles_L(1,1:enddata)-rad2deg(eulAng_LB_ref(1,1:enddata))); hold on;grid on;
 title('Euler angles errors');
 ylabel('x (est-ref) [degree]','FontSize',50);set(gca,'FontSize',15);
 subplot(3,2,4)
-plot(tSim, angles_L(2,:)-eulAng_LB_ref(2,1:enddata)); hold on;grid on;
+plot(tSim, angles_L(2,1:enddata)-rad2deg(eulAng_LB_ref(2,1:enddata))); hold on;grid on;
 ylabel('y (est-ref) [degree]','FontSize',50);set(gca,'FontSize',15);
 subplot(3,2,6)
-plot(tSim, angles_L(3,:)-eulAng_LB_ref(3,1:enddata)); hold on;grid on;
+plot(tSim, angles_L(3,1:enddata)-rad2deg(eulAng_LB_ref(3,1:enddata))); hold on;grid on;
 ylabel('z (est-ref) [degree]','FontSize',50);set(gca,'FontSize',15);
 xlabel('time [s]','FontSize',20);
 
@@ -424,20 +426,20 @@ xlabel('time [s]');
 
 h(6) = figure('Name','Angular rates LB in B');
 subplot(3,1,1)
-% plot(tSim, rad2deg(angRate_LB_B_est(1,:)),'b'); hold on;grid on;
+% plot(tSim, rad2deg(angRate_LB_B_est(1,1:enddata)),'b'); hold on;grid on;
 plot(tSim, rad2deg(angRate_LB_B_ref(1,1:enddata)),'b'); hold on;grid on;
 title('INS angular rates LB in B');
 ylabel('phi [deg/s]');
 % legend('fLaINSest','Ref.')
 legend('Ref.')
 subplot(3,1,2)
-% plot(tSim, rad2deg(angRate_LB_B_est(2,:)),'b'); hold on;grid on;
+% plot(tSim, rad2deg(angRate_LB_B_est(2,1:enddata)),'b'); hold on;grid on;
 plot(tSim, rad2deg(angRate_LB_B_ref(2,1:enddata)),'b'); hold on;grid on;
 ylabel('theta [deg/s]');
 % legend('fLaINSest','Ref.')
 legend('Ref.')
 subplot(3,1,3)
-% plot(tSim, rad2deg(angRate_LB_B_est(3,:)),'b'); hold on;grid on;
+% plot(tSim, rad2deg(angRate_LB_B_est(3,1:enddata)),'b'); hold on;grid on;
 plot(tSim, rad2deg(angRate_LB_B_ref(3,1:enddata)),'b'); hold on;grid on;
 ylabel('psi [deg/s]');
 % legend('fLaINSest','Ref.')
@@ -452,6 +454,7 @@ subplot(2,1,1);
 plot(tSim,erricp2base(1:enddata));
 subplot(2,1,2);
 plot(tSim,erricp2last(1:enddata));
+%saveas(gcf,'simResults03_FS04_Case20useful.fig');
 %% pure mid integration results
 e4 = estimatorv3(window_size, X_init);
 
