@@ -24,7 +24,7 @@ c = 50;% frame size = 50 imu data points
 
 %load data 
 %load('D:\GOG\DA\code\data\usefuldatafromNavFramework.mat')
-load('D:\GOG\DA\code\data\simResults03_FS04_Case20useful.mat')
+load('D:\GOG\DA\code\data\simResults02_FS04_Case20useful.mat')
 
 
 %%
@@ -135,7 +135,8 @@ for i = 1:enddata
         
         [deltaX_icp2base(:,floor(i/100)+1), deltaX_icp2last(:,floor(i/100)+1),flagRegFinished, consec2base,...
             deltaX2base_ref(:,floor(i/100)+1), deltaX2last_ref(:,floor(i/100)+1),flagNewNode,erricp2base(i),erricp2last(i),...
-            numValidPoints, mHRF,deltaX_icp2base_g(:,floor(i/100)+1),deltaX_icp2last_g(:,floor(i/100)+1)] = fLProcessing(...
+            numValidPoints, mHRF,deltaX_icp2base_g(:,floor(i/100)+1),deltaX_icp2last_g(:,floor(i/100)+1)] ...
+            = fLProcessing(...
             pose_ref, Xn_pose_cur,...
             fL1MeasArrayDir, fL1MeasRange(:,:,i), fL1MeasFlagNewData,...
             navMode, flagUseTrueRelStates,computeICP2base,...                               %input
@@ -192,7 +193,7 @@ tSim = linspace(0,floor(enddata/10),enddata);
 posi_NB_N_ref = posi_LB_L_ref;
 vel_NB_N_ref = vel_LB_L_ref;
 R_NB_ref = R_LB_ref;
-angles_ref_N = eulAng_LB_ref;
+angles_ref_N = rad2deg(eulAng_LB_ref);
 index = find(NodeChange);
 R_LN = eye(3);
 %effGrav_T = gravity_T - cross(angRate_IT_T,cross(angRate_IT_T, posi_TL_T + R_LT* obj.posi_LB_L));
@@ -452,8 +453,12 @@ plot(tSim,NodeChange(1:enddata));
 h(99) = figure('Name','icp error');
 subplot(2,1,1);
 plot(tSim,erricp2base(1:enddata));
+legend('ICP to base PC')
+
 subplot(2,1,2);
 plot(tSim,erricp2last(1:enddata));
+legend('ICP to last PC')
+
 %saveas(gcf,'simResults03_FS04_Case20useful.fig');
 %% pure mid integration results
 e4 = estimatorv3(window_size, X_init);

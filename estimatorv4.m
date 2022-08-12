@@ -168,7 +168,7 @@ classdef estimatorv4 < handle
                 obj.pre_integrations = [obj.pre_integrations IntegrationBasev2(obj.acc_0, obj.gyr_0, obj.Bas(obj.frame_count), obj.Bgs(obj.frame_count))];
             end
             
-            current_g = angular_velocity - obj.Rs(:,:,obj.frame_count).' * angRate_IL_L;
+            current_g = angular_velocity - (obj.R_LN'*obj.Rs(:,:,obj.frame_count)).' * angRate_IL_L;
             % current_a = obj.Rs(:,:,obj.frame_count) * (linear_acceleration - obj.Bas(:,obj.frame_count)) + effGrav_L - 2 * cross(angRate_IL_L, obj.Vs(:,obj.frame_count));
             % current_a_sup = effGrav_L - 2 * cross(angRate_IL_L, obj.Vs(:,obj.frame_count));
             if (obj.frame_count ~= 1)
@@ -316,13 +316,15 @@ classdef estimatorv4 < handle
                 global ICP_N_q;
                 ICP_N_t_ = ICP_N_t;
                 ICP_N_q_ = ICP_N_q;
-            [para_pose,para_speedbias] = ceres_optimization_no2base(obj.Ps,obj.Rs,obj.Qs,obj.Vs,obj.Bas,obj.Bgs,...
-                obj.dpContainer,obj.dqContainerArray,obj.dvContainer,obj.JContainer,obj.PContainer,...
-                obj.baContainer,obj.bgContainer,obj.dtContainer,obj.deltaT2last,obj.deltaT2base,obj.frame_count,obj.g_sum,ICP_N_t_,ICP_N_q_, obj.base_state);
- 
-%             [para_pose,para_speedbias] = ceres_optimization_allresiduals_sameN_fixedfirstframe(obj.Ps,obj.Rs,obj.Qs,obj.Vs,obj.Bas,obj.Bgs,...
+%             [para_pose,para_speedbias] = ceres_optimization_no2base(obj.Ps,obj.Rs,obj.Qs,obj.Vs,obj.Bas,obj.Bgs,...
 %                 obj.dpContainer,obj.dqContainerArray,obj.dvContainer,obj.JContainer,obj.PContainer,...
-%                 obj.baContainer,obj.bgContainer,obj.dtContainer,obj.deltaT2last,obj.deltaT2base,obj.frame_count,obj.g_sum,ICP_N_t_,ICP_N_q_, obj.base_state);
+%                 obj.baContainer,obj.bgContainer,obj.dtContainer,obj.deltaT2last,obj.deltaT2base,...
+%                 obj.frame_count,obj.g_sum,ICP_N_t_,ICP_N_q_, obj.base_state);
+ 
+            [para_pose,para_speedbias] = ceres_optimization_allresiduals_sameN_fixedfirstframe(obj.Ps,obj.Rs,obj.Qs,obj.Vs,obj.Bas,obj.Bgs,...
+                obj.dpContainer,obj.dqContainerArray,obj.dvContainer,obj.JContainer,obj.PContainer,...
+                obj.baContainer,obj.bgContainer,obj.dtContainer,obj.deltaT2last,obj.deltaT2base,...
+                obj.frame_count,obj.g_sum,ICP_N_t_,ICP_N_q_, obj.base_state);
 
 %             [para_pose,para_speedbias] = ceres_optimization_onlyPC(obj.Ps,obj.Rs,obj.Qs,obj.Vs,obj.Bas,obj.Bgs,...
 %                 obj.dpContainer,obj.dqContainerArray,obj.dvContainer,obj.JContainer,obj.PContainer,...
@@ -433,11 +435,12 @@ classdef estimatorv4 < handle
             %更新N2L
             obj.posi_LN_L = obj.posi_LN_L + obj.R_LN'*posi_N1N2_N1;
             obj.R_LN = R_N1N2*obj.R_LN;
+            %更新previous_a
+            obj.previous_a = R_N1N2*obj.previous_a;
             %清空state，或者说重新做一次构造函数初始化的state部分
             initialize(obj)
             %framecount置1
             %用BinNj 做为init 初始化一下flprocessing
-            
         end
         
         function initialize(obj)
