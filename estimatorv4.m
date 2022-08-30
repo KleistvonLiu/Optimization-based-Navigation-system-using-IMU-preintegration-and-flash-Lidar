@@ -197,7 +197,7 @@ classdef estimatorv4 < handle
                 un_gyr = 0.5 * (obj.gyr_0 + current_g) - obj.Bgs(:,j);% !! Bgs(j)
                 un_gyr = un_gyr * dt;
                 obj.Rs(:,:,j) =obj.Rs(:,:,j)*quat2rotmliub([un_gyr(1)/2,un_gyr(2)/2,un_gyr(3)/2,1]).';
-                current_a = obj.Rs(:,:,j) * (linear_acceleration - obj.Bas(:,j)) + obj.effGrav_N - 2 * cross(angRate_IL_L, obj.Vs(:,obj.frame_count));% 这里都应该是这一时刻的数据
+                current_a = obj.Rs(:,:,j) * (linear_acceleration - obj.Bas(:,j)) + obj.effGrav_N - 2 * cross(obj.R_LN*angRate_IL_L, obj.Vs(:,obj.frame_count));% 这里都应该是这一时刻的数据
                 un_acc = 0.5 * (obj.previous_a + current_a);
                 obj.Ps(:,j) =obj.Ps(:,j) + dt * obj.Vs(:,j) + 0.5 * dt * dt * un_acc;
                 obj.Vs(:,j) =obj.Vs(:,j) + dt * un_acc;
