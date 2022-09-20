@@ -15,7 +15,8 @@ angles = [];
 NodeChange = [];
 P_LB_L = [];
 R_LB = [];
-
+maps = [];
+mapIndex = 1;
 % ！！！！应该是要改成成员变量的，那就不用这么麻烦了
 %g=0;
 
@@ -26,7 +27,19 @@ c = 50;% frame size = 50 imu data points
 %load('D:\GOG\DA\code\data\usefuldatafromNavFramework.mat')
 load('D:\GOG\DA\code\data\simResults03_FS04_Case20useful.mat')
 
+%% === Mapping
+covFLMeasErr = 0*[0.05 0.01 0.01 0.01]';
 
+paramSGM.mapSize = [20 20]; % x,y meters
+paramSGM.gridResolution = 0.4; % meter 要保证 offset和mapsize除以它得到的是整数
+paramSGM.gridSize = paramSGM.mapSize / paramSGM.gridResolution;
+paramSGM.coorOffset = [6 12]; % [x y]
+paramSGM.idxOffset = paramSGM.coorOffset/paramSGM.gridResolution;
+
+
+paramSGM.meanPoints = zeros(paramSGM.gridSize(2), paramSGM.gridSize(1),3);
+paramSGM.numPointsPerCell = zeros(paramSGM.gridSize(2),paramSGM.gridSize(1));
+paramSGM.covar = zeros(paramSGM.gridSize(2),paramSGM.gridSize(1),6);% [a11 a12 a13 a22 a23 a33]
 %%
 % initial pose of B in L
 X_init = [-0.010835766809501;-0.037451635197423;-7.547757199546605;0;0;0;0;0;-0.698100000000000;0.716000000000000];
@@ -119,12 +132,18 @@ end
 % end
 acc_LB_L_ref = downsample(acc_LB_L_ref,100);
 acc_LB_L_ref = acc_LB_L_ref.';
+
 %% 相较于estimatorv3,v4是基于relative navigation的
 
 e4 = estimatorv4(window_size, X_init);
 
 
 clear fLProcessing % clear persistent variables
+clear SurfelGridMap
+surfelMap_new_meanP = []; 
+surfelMap_new_covar = [];
+surfelMap_new_numPsCell = [];
+mapIndex = 1;
 
 flag = 3;%1 只有一帧，测试中值积分功能;2只有11帧，测试积分以及滑窗以及只有IMU的优化功能。3可变滑窗以及PC优化功能
 
@@ -167,8 +186,19 @@ for i = 1:enddata
                 fL1MeasArrayDir, fL1MeasRange(:,:,i), fL1MeasFlagNewData,...
                 navMode, flagUseTrueRelStates,computeICP2base,...                               %input
                 fLArrayDim, fL1Pose_B, X_initNew,params4base,params4last);
+            
+            mapIndex = mapIndex + 1;
         end
-         
+        stateEst = zeros(10,1);
+        [stateEst(1:3,1),~,tempR,~,~,~] = e4.outputState();
+        stateEst(7:10,1) = rotm2quatliub(tempR');
+        [surfelMap_new_meanP(:,:,:,mapIndex), surfelMap_new_covar(:,:,:,mapIndex), surfelMap_new_numPsCell(:,:,mapIndex),...
+            surfelMap_old_meanP, surfelMap_old_covar, surfelMap_old_numPsCell,...
+            flagNewSurfelMap]=...
+            SurfelGridMap(stateEst, 1,...
+            fL1MeasArrayDir, fL1MeasRange(:,:,i), fL1MeasFlagNewData, flagNewNode,...
+            paramSGM, fL1Pose_B);
+
     end
             
     %index = min(window_size + 1,ceil(i/step)+1);
@@ -473,6 +503,110 @@ title('ICP to base PC')
 subplot(2,1,2);
 plot(tSim,erricp2last(1:enddata));
 title('ICP to last PC')
+%% SGM
+h(15) = figure('Name','SGM');
+colorSGM = 4;
+nodeMapIndex = 1;
+SGM_meanPoints_list = reshape(surfelMap_new_meanP(:,:,:,nodeMapIndex),[],3);
+% plot 3d 
+for i = 1:paramSGM.gridSize(1)
+	for j = 1:paramSGM.gridSize(2)
+        if (surfelMap_new_numPsCell(j,i,1)<10),continue;end
+        meanP = squeeze(surfelMap_new_meanP(j,i,:,nodeMapIndex));    
+        covari = squeeze(surfelMap_new_covar(j,i,:,nodeMapIndex));%[a11 a12 a13 a22 a23 a33]
+
+        covMatrix = [covari(1) covari(2) covari(3);...
+                    covari(2) covari(4) covari(5);...
+                    covari(3) covari(5) covari(6)];
+        plot_gaussian_ellipsoid(meanP, covMatrix, 1.5, 10, gca);hold on;
+   end
+end
+% plot 2d 有问题
+% for i = 1:paramSGM.gridSize(1)
+% 	for j = 1:paramSGM.gridSize(2)
+%         if (surfelMap_new_numPsCell(j,i,1)<10),continue;end
+%         meanP = squeeze(surfelMap_new_meanP(j,i,1:2,1));    
+%         covari = squeeze(surfelMap_new_covar(j,i,:,1));%[a11 a12 a13 a22 a23 a33]
+% 
+%         covMatrix = [covari(1) covari(2);...
+%                     covari(2) covari(4)];
+%         plot_gaussian_ellipsoid(meanP, covMatrix, 2, 10, gca);hold on;
+%    end
+% end
+% plot3(SGM_meanPoints_list(:,1),...
+%     SGM_meanPoints_list(:,2),...
+%     SGM_meanPoints_list(:,3),'ob');
+title('Mean points(o)&Covariance in SGM');
+daspect([1 1 1]);
+xlabel('X');ylabel('Y');zlabel('Z');
+% zlim([5 9]);
+% for the "spacecraft body frame"
+h(15).CurrentAxes.YDir = 'Reverse';
+h(15).CurrentAxes.ZDir = 'Reverse';
+h(15).CurrentAxes.XColor = 'red';
+h(15).CurrentAxes.YColor = 'green';
+h(15).CurrentAxes.ZColor = 'blue';
+h(15).CurrentAxes.LineWidth = 3.0;
+grid on;
+
+
+%%
+% ====================================
+h(16) = figure('Name','All SGMs');
+kInstant = find(flagNewNode_est);
+count = 1;
+for k = 1:2:size(kInstant,1)
+    disp('drawing SGM...');
+    g = kInstant(k);
+    p_l_n_g = posi_LN_est(:,g);
+	R_l_n_g = R_LN_est(:,:,g);
+    SGM_meanP_old_g = SGM_meanP_old(:,:,:,g);
+    SGM_covar_old_g = SGM_covar_old(:,:,:,g);
+    SGM_numPsCell_old_g = SGM_numPsCell_old(:,:,g);
+ 
+    SGM_meanP_old_k_list = reshape(SGM_meanP_old_g,[],3);
+    SGM_meanP_old_k_trans_list = SGM_meanP_old_k_list * R_l_n_g + p_l_n_g';
+	SGM_meanP_old_k_trans = reshape(SGM_meanP_old_k_trans_list,size(SGM_meanP_old_g));  
+    
+    interval = 1;
+%     if((count == 2)||(count == 4)||(count == 4)),count = count+1;continue;end
+    for i = 1:interval:paramSGM.gridSize(1)
+       for j = 1:interval:paramSGM.gridSize(2)
+        if (SGM_numPsCell_old_g(j,i)<10),continue;end
+        meanP = squeeze(SGM_meanP_old_k_trans(j,i,:));    
+        covari = squeeze(SGM_covar_old_g(j,i,:));%[a11 a12 a13 a22 a23 a33]
+
+        covMatrix = [covari(1) covari(2) covari(3);...
+                    covari(2) covari(4) covari(5);...
+                    covari(3) covari(5) covari(6)];
+        plot_gaussian_ellipsoid(meanP, covMatrix, 2, 10,gca,count);hold on;
+       end
+    end
+    count = count+1;
+end
+plot3(posi_LB_L_ref(1:numStepSim*dtSimRatio,1),...
+    posi_LB_L_ref(1:numStepSim*dtSimRatio,2),...
+    posi_LB_L_ref(1:numStepSim*dtSimRatio,3),'.r');grid on;
+plot3(posi_LB_L_ref(kInstant*dtSimRatio,1),...
+    posi_LB_L_ref(kInstant*dtSimRatio,2),...
+    posi_LB_L_ref(kInstant*dtSimRatio,3),'*b');grid on;
+title('All SGMs');
+daspect([1 1 1]);
+xlabel('X');ylabel('Y');zlabel('Z');
+% xlim([0 25]);ylim([-8 8]);
+% zlim([5 9]);
+% for the "spacecraft body frame"
+h(16).CurrentAxes.YDir = 'Reverse';
+h(16).CurrentAxes.ZDir = 'Reverse';
+h(16).CurrentAxes.XColor = 'red';
+h(16).CurrentAxes.YColor = 'green';
+h(16).CurrentAxes.ZColor = 'blue';
+h(16).CurrentAxes.LineWidth = 3.0;
+grid on;
+
+
+% ====================================
+set(0,'DefaultFigureWindowStyle','normal')
 
 %saveas(gcf,'simResults02_FS04_Case20useful.fig');
 %% pure mid integration results
@@ -511,12 +645,17 @@ er7 = max(abs(vecnorm(Ps1(:,1:enddata)-posi_LB_L_ref(:,1:enddata))));
 %er7 = sum(abs(Ps1(:,1:enddata)-posi_LB_L_ref(:,1:enddata)),'all');
 %% check the PC
 basepcindex = 1301;
-pcindex = 1501;
+pcindex = 1;
 pc1(:,:,1) = fL1MeasArrayDir(:,:,1) .* fL1MeasRange(:,:,pcindex);
 pc1(:,:,2) = fL1MeasArrayDir(:,:,2) .* fL1MeasRange(:,:,pcindex);
 pc1(:,:,3) = fL1MeasArrayDir(:,:,3) .* fL1MeasRange(:,:,pcindex);
 pc11 = reshape(pc1,[],3);
-%pc11 = downsample(pc11,10);
+
+% current point cloud in body frame
+% fL1Att_Dcm_BU = quat2rotmliub(fL1Pose_B(4:7,1)); % rotation matrix from B to U
+% pc11 = pc11 * fL1Att_Dcm_BU + repmat(fL1Pose_B(1:3,1)',size(pc11,1),1);
+
+pc11 = downsample(pc11,10);
 
 pc2(:,:,1) = fL1MeasArrayDir(:,:,1) .* fL1MeasRange(:,:,basepcindex);
 pc2(:,:,2) = fL1MeasArrayDir(:,:,2) .* fL1MeasRange(:,:,basepcindex);
@@ -543,10 +682,70 @@ zlabel('z_{S} (m)','Fontsize',28);
 % zlim([2 8])
 % for a "navigation local-level frame"
 f.CurrentAxes.YDir = 'Reverse';
-f.CurrentAxes.ZDir = 'Reverse';
+%f.CurrentAxes.ZDir = 'Reverse';
 f.CurrentAxes.XColor = 'red';
 f.CurrentAxes.YColor = 'green';
 f.CurrentAxes.ZColor = 'blue';
 f.CurrentAxes.LineWidth = 3.0;
 drawnow
 % view([-136.9875 46.9261]);
+%%
+clear SurfelGridMap
+tempState = zeros(10,1);
+tempState(10) = 1;
+tempState2 = zeros(7,1);
+tempState2(7) = 1;
+surfelMap_new_meanPtemp = [];
+surfelMap_new_covartemp = [];
+surfelMap_new_numPsCelltemp = [];
+
+[surfelMap_new_meanPtemp(:,:,:,1), surfelMap_new_covartemp(:,:,:,1), surfelMap_new_numPsCelltemp(:,:,1),...
+    surfelMap_old_meanP, surfelMap_old_covar, surfelMap_old_numPsCell,...
+    flagNewSurfelMap]=...
+    SurfelGridMap(tempState, 1,...
+    fL1MeasArrayDir, fL1MeasRange(:,:,pcindex), fL1MeasFlagNewData, flagNewNode,...
+    paramSGM, tempState2);
+h(17) = figure('Name','SGM');
+colorSGM = 4;
+nodeMapIndex = 1;
+SGM_meanPoints_list = reshape(surfelMap_new_meanPtemp(:,:,:,nodeMapIndex),[],3);
+% plot 3d 
+for i = 1:paramSGM.gridSize(1)
+	for j = 1:paramSGM.gridSize(2)
+        if (surfelMap_new_numPsCelltemp(j,i,1)<10),continue;end
+        meanP = squeeze(surfelMap_new_meanPtemp(j,i,:,nodeMapIndex));    
+        covari = squeeze(surfelMap_new_covartemp(j,i,:,nodeMapIndex));%[a11 a12 a13 a22 a23 a33]
+
+        covMatrix = [covari(1) covari(2) covari(3);...
+                    covari(2) covari(4) covari(5);...
+                    covari(3) covari(5) covari(6)];
+        plot_gaussian_ellipsoid(meanP, covMatrix, 1.5, 10, gca);hold on;
+   end
+end
+% plot 2d 有问题
+% for i = 1:paramSGM.gridSize(1)
+% 	for j = 1:paramSGM.gridSize(2)
+%         if (surfelMap_new_numPsCell(j,i,1)<10),continue;end
+%         meanP = squeeze(surfelMap_new_meanP(j,i,1:2,1));    
+%         covari = squeeze(surfelMap_new_covar(j,i,:,1));%[a11 a12 a13 a22 a23 a33]
+% 
+%         covMatrix = [covari(1) covari(2);...
+%                     covari(2) covari(4)];
+%         plot_gaussian_ellipsoid(meanP, covMatrix, 2, 10, gca);hold on;
+%    end
+% end
+% plot3(SGM_meanPoints_list(:,1),...
+%     SGM_meanPoints_list(:,2),...
+%     SGM_meanPoints_list(:,3),'ob');
+title('Mean points(o)&Covariance in SGM');
+daspect([1 1 1]);
+xlabel('X');ylabel('Y');zlabel('Z');
+% zlim([5 9]);
+% for the "spacecraft body frame"
+h(15).CurrentAxes.YDir = 'Reverse';
+h(15).CurrentAxes.ZDir = 'Reverse';
+h(15).CurrentAxes.XColor = 'red';
+h(15).CurrentAxes.YColor = 'green';
+h(15).CurrentAxes.ZColor = 'blue';
+h(15).CurrentAxes.LineWidth = 3.0;
+grid on;
