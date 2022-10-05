@@ -117,7 +117,7 @@ else
                continue;
             end
             dataPoints_ji = dataPoints_N(indexSelected,:);
-            dataPoints_ji = dataPoints_ji((abs(dataPoints_ji(:,1))>0.01),:);
+            find(abs(dataPoints_ji(:,1))>0.01),:);
             dataNumPoints = size(dataPoints_ji,1);
             dataMean_ji = mean(dataPoints_ji);%3x1
             dataCov_ji = cov(dataPoints_ji);

@@ -3,7 +3,7 @@ addpath('D:\GOG\DA\code\attitudeFunctionMatlab_liub');
 clear
 %% 
 % load parameters first
-parameters
+% parameters
 
 Rs = [];
 Ps = [];
@@ -23,9 +23,64 @@ mapIndex = 1;
 window_size = 5;
 c = 50;% frame size = 50 imu data points
 
+global ACC_N
+global GYR_N
+global ACC_W
+global GYR_W
+%global g
+global posi_TL_T
+global quat_TL
+global angRate_IT_T
+global R_LT;
+global angRate_IL_L;
+global ICP_N_t;
+global ICP_N_q;
+
+%global X_init
+% value from vins
+% ACC_N=0.08;%
+% GYR_N=0.004;
+% ACC_W=0.00004;
+% GYR_W=2.0e-6;
+% value used until 11072022
+% ACC_N=1e-10;%
+% GYR_N=1e-10;
+% ACC_W=1e-5;
+% GYR_W=1e-5;
+noiseSource_Ts = 0.004;
+acc_N = 4.2e-4 * 9.81/sqrt(3600); % [m/s^(3/2)]
+whiteNoiseAcc.PSD = acc_N^2;%0.00000023361; % [(m/s^2)^2/Hz] PSD of white noise
+whiteNoiseAcc.Ts = noiseSource_Ts;% [s] sample time of white noise
+param_accx_bi.B       = 4e-6 * 9.81/3600; % [m/s^2]
+
+gyro_N = 0.0002 * pi/180/sqrt(3600); % [rad/s^(1/2)]
+whiteNoiseGyro.PSD = gyro_N^2;%0.000025; % [(deg/s)^2/Hz] PSD of white noise
+whiteNoiseGyro.Ts = noiseSource_Ts;% [s] sample time of white noise
+param_gyrox_bi.B       = 5e-4/3 * pi/180/3600; % [rad/s]
+
+% ACC_N=4.2e-4 * 9.81/sqrt(3600);%
+% GYR_N=0.0002 * pi/180/sqrt(3600);
+% ACC_W=ACC_N*ACC_N;
+% GYR_W=GYR_N*GYR_N;
+
+factor1 = 7e-3;%1e-1;
+factor2 = 1e-4;%1e+6;
+factor21 = 1e-0;
+
+ACC_N=factor1*sqrt(whiteNoiseAcc.PSD/whiteNoiseAcc.Ts);%
+GYR_N=factor21*factor1*sqrt(whiteNoiseGyro.PSD/whiteNoiseGyro.Ts);
+ACC_W=factor2*sqrt(0.664*param_accx_bi.B);
+GYR_W=factor21*factor2*sqrt(0.664*param_gyrox_bi.B);
+
+%factor3 = 1e-0;
+% 1e-2和1e+2
+ICP_N_t = 5e-1;%1e-2
+ICP_N_q = 1e+1;%1e+2
+
+
 %load data 
 %load('D:\GOG\DA\code\data\usefuldatafromNavFramework.mat')
-load('D:\GOG\DA\code\data\simResults03_FS04_Case20useful.mat')
+load('D:\DA_JiangfengLIU\Optimization-based-Navigation-system-using-IMU-preintegration-and-flash-Lidar-main\data\simResults03_FS04_Case20useful.mat')
 
 %% === Mapping
 covFLMeasErr = 0*[0.05 0.01 0.01 0.01]';
@@ -86,6 +141,7 @@ for i = 1:length(fL1MeasArrayRange.signals.values)
         fL1MeasArrayRange.signals.values(:,:,i) = fL1MeasArrayRange.signals.values(:,:,i) + fL1MeasRangenoise(:,:,(i-1)/100+1);
     end
 end
+
 fL1MeasRange = fL1MeasArrayRange.signals.values;
 
 
@@ -230,6 +286,7 @@ er4 = sum(vecnorm(posi_LB_L_est(:,1:enddata)-posi_LB_L_ref(:,1:enddata)))/enddat
 
 tSim = linspace(0,floor(enddata/10),enddata); 
 
+return
 %% compute reference pose in N
 
 posi_NB_N_ref = posi_LB_L_ref;
@@ -645,7 +702,7 @@ er7 = max(abs(vecnorm(Ps1(:,1:enddata)-posi_LB_L_ref(:,1:enddata))));
 %er7 = sum(abs(Ps1(:,1:enddata)-posi_LB_L_ref(:,1:enddata)),'all');
 %% check the PC
 basepcindex = 1301;
-pcindex = 7001;
+pcindex = 1;
 pc1(:,:,1) = fL1MeasArrayDir(:,:,1) .* fL1MeasRange(:,:,pcindex);
 pc1(:,:,2) = fL1MeasArrayDir(:,:,2) .* fL1MeasRange(:,:,pcindex);
 pc1(:,:,3) = fL1MeasArrayDir(:,:,3) .* fL1MeasRange(:,:,pcindex);
@@ -682,7 +739,7 @@ zlabel('z_{S} (m)','Fontsize',28);
 % zlim([2 8])
 % for a "navigation local-level frame"
 f.CurrentAxes.YDir = 'Reverse';
-f.CurrentAxes.ZDir = 'Reverse';
+%f.CurrentAxes.ZDir = 'Reverse';
 f.CurrentAxes.XColor = 'red';
 f.CurrentAxes.YColor = 'green';
 f.CurrentAxes.ZColor = 'blue';

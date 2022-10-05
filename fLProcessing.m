@@ -289,9 +289,11 @@ else
         if(flagUseTrueRelStates >0.5)
             deltaX_icp2last = deltaX2last_ref;
         else
+            tic
             [T2last, erricp2last] = pcicpFL_LJF_V2_mex(curPc_B_sampled, lastPc, params4last);
             deltaX_icp2last(1:3,1) = T2last(1:3,4);
             deltaX_icp2last(4:7,1) = rotm2quatliub(T2last(1:3,1:3).');
+            toc
         end        
         
         state_lastPc = Xn_pose_cur;
